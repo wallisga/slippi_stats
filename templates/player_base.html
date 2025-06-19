@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block player_dropdown %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle active" href="#" id="playerDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Players
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="playerDropdown">
+        <li><a class="dropdown-item" href="/players">Player Index</a></li>
+        <!-- Current player options -->
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">{{ player_code }}</h6></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="basic" href="#">Basic Profile</a></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="detailed" data-suffix="/detailed" href="#">Detailed Stats</a></li>
+        <!-- Character links if available -->
+        {% if stats and stats.character_stats %}
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">Character Stats</h6></li>
+        {% for char in stats.character_stats.keys() %}
+        <li><a class="dropdown-item character-link" data-path="/player/" data-code="{{ player_code }}" data-character="{{ char }}" href="#">
+            <span data-character-name="{{ char }}" class="character-container"></span> {{ char }}
+        </a></li>
+        {% endfor %}
+        {% endif %}
+    </ul>
+</li>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Handle player links with proper URL encoding
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get current page path for active state detection
+        const currentPath = window.location.pathname;
+        
+        // Process player links
+        const playerLinks = document.querySelectorAll('.player-link');
+        playerLinks.forEach(link => {
+            const path = link.getAttribute('data-path');
+            const playerCode = link.getAttribute('data-code');
+            const suffix = link.getAttribute('data-suffix') || '';
+            const view = link.getAttribute('data-view');
+            
+            // Build the properly encoded URL
+            const encodedPlayerCode = encodeURIComponent(playerCode);
+            const fullUrl = `${path}${encodedPlayerCode}${suffix}`;
+            
+            // Set the href attribute with properly encoded URL
+            link.setAttribute('href', fullUrl);
+            
+            // Active state detection - handle both views correctly
+            if (view === 'basic' && currentPath === `${path}${encodedPlayerCode}`) {
+                link.classList.add('active');
+            } else if (view === 'detailed' && currentPath === `${path}${encodedPlayerCode}${suffix}`) {
+                link.classList.add('active');
+            }
+        });
+        
+        // Process character links
+        const characterLinks = document.querySelectorAll('.character-link');
+        characterLinks.forEach(link => {
+            const path = link.getAttribute('data-path');
+            const playerCode = link.getAttribute('data-code');
+            const character = link.getAttribute('data-character');
+            
+            // Build the properly encoded URL
+            const encodedPlayerCode = encodeURIComponent(playerCode);
+            const encodedCharacter = encodeURIComponent(character);
+            const fullUrl = `${path}${encodedPlayerCode}/character/${encodedCharacter}`;
+            
+            // Set the href attribute with properly encoded URL
+            link.setAttribute('href', fullUrl);
+            
+            // Set active class if this is the current page
+            if (currentPath === fullUrl) {
+                link.classList.add('active');
+            }
+        });
+        
+        // Debug info
+        console.log("Current path:", currentPath);
+        console.log("Player links set up:", playerLinks.length);
+        console.log("Character links set up:", characterLinks.length);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Slippi specific - IMPORTANT!
+config.py
+config_local.py
+.env
+*.db
+*.log
+logs/
+backups/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Instance folder
+instance/
+
+# Don't commit database files
+slippi_data.db
+*.sqlite
+*.sqlite3

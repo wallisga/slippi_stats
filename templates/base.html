@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Slippi Stats{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    {% block extra_css %}{% endblock %}
+    <style>
+        .navbar-search {
+            max-width: 300px;
+        }
+        {% block additional_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark {% block navbar_class %}{% endblock %}">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Slippi Stats</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Home</a>
+                    </li>
+                    
+                    {% block player_dropdown %}
+                    <li class="nav-item {% if '/player/' in request.path %}active{% endif %}">
+                        <a class="nav-link" href="/players">Players</a>
+                    </li>
+                    {% endblock %}
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path.startswith('/#recent') %}active{% endif %}" href="/#recent">Recent Games</a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path.startswith('/download') %}active{% endif %}" href="/download">Download</a>
+                    </li>
+                    
+                    {% block additional_nav_items %}{% endblock %}
+                </ul>
+                
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="{% block content_container_class %}container mt-4{% endblock %}">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p>Slippi Stats - A tool for Super Smash Bros. Melee statistics</p>
+            <p class="small">Powered by the Slippi Stats Collector</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}
+    <script>
+        // Player search form handler
+        document.getElementById('playerSearchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const playerCode = document.getElementById('playerCodeInput').value.trim();
+            if (playerCode) {
+                // Encode the player tag for URL
+                const encodedTag = encodeURIComponent(playerCode);
+                window.location.href = `/player/${encodedTag}`;
+            }
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>

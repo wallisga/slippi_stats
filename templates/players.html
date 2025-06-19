@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Players | Slippi Stats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .search-container {
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Slippi Stats</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/download">Download</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/players">Player Index</a>
+                    </li>                    
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>Player Index</h1>
+        <p class="lead">Showing all player tags found in recent games</p>
+        
+        <div class="search-container">
+            <input type="text" id="playerSearch" class="form-control" placeholder="Filter players...">
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="playersTable">
+                        <thead>
+                            <tr>
+                                <th>Player Tag</th>
+                                <th>Player Name</th>
+                                <th>Characters</th>
+                                <th>Game Count</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for player in players %}
+                            <tr>
+                                <td><code>{{ player.tag }}</code></td>
+                                <td>{{ player.name }}</td>
+                                <td>{{ player.characters }}</td>
+                                <td>{{ player.count }}</td>
+                                <td>
+                                    <a href="/player/{{ player.encoded_tag }}" class="btn btn-sm btn-primary">View Profile</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Filter table based on search input
+        document.getElementById('playerSearch').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const table = document.getElementById('playersTable');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const tag = row.querySelector('td:first-child').textContent.toLowerCase();
+                const name = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                
+                if (tag.includes(searchTerm) || name.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slippi Stats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .jumbotron {
+            padding: 2rem;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .player-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+        }
+        .player-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .search-container {
+            max-width: 500px;
+            margin: 0 auto 2rem auto;
+        }
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .error-message {
+            text-align: center;
+            padding: 2rem;
+            color: #dc3545;
+        }
+        
+        /* Character icons */
+        .character-icon {
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        .character-icon-fallback {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background-color: #f8f9fa;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            text-align: center;
+            line-height: 24px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        /* Character-specific fallback colors */
+        .character-icon-fallback[data-character="fox"] {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .character-icon-fallback[data-character="falco"] {
+            background-color: #0d6efd;
+            color: white;
+        }
+        
+        .character-icon-fallback[data-character="marth"] {
+            background-color: #0dcaf0;
+            color: white;
+        }
+        
+        .character-container {
+            display: inline-flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Slippi Stats</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/download">Download</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/players">Player Index</a>
+                    </li> 
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="jumbotron">
+            <h1 class="display-4">Slippi Stats</h1>
+            <p class="lead">Analyze your Super Smash Bros. Melee gameplay with detailed statistics.</p>
+            <hr class="my-4">
+            <p>Track your performance across different characters, stages, and matchups to improve your game.</p>
+        </div>
+
+        <div class="search-container">
+            <form id="playerSearchForm" class="d-flex">
+                <input class="form-control me-2" type="search" placeholder="Enter player tag (e.g. EXO#196)" aria-label="Search" id="playerCodeInput">
+                <button class="btn btn-primary" type="submit">Find Player</button>
+            </form>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Games</h5>
+                        <p class="display-4">{{ total_games }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Players</h5>
+                        <p class="display-4">{{ total_players }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Last Updated</h5>
+                        <p class="h4" id="lastUpdated">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-7">
+                <h2 class="mb-3" id="stats">Recent Games</h2>
+                <div class="card stat-card">
+                    <div class="card-body">
+                        {% if recent_games %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Player 1</th>
+                                        <th>Character</th>
+                                        <th>Player 2</th>
+                                        <th>Character</th>
+                                        <th>Winner</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for game in recent_games %}
+                                    <tr>
+                                        <td>{{ game.time }}</td>
+                                        <td>
+                                            <a href="/player/{{ game.player1_tag_encoded }}">{{ game.player1 }}</a>
+                                        </td>
+                                        <td>
+                                            <span data-character-name="{{ game.character1 }}" class="character-container"></span>
+                                            {{ game.character1 }}
+                                        </td>
+                                        <td>
+                                            <a href="/player/{{ game.player2_tag_encoded }}">{{ game.player2 }}</a>
+                                        </td>
+                                        <td>
+                                            <span data-character-name="{{ game.character2 }}" class="character-container"></span>
+                                            {{ game.character2 }}
+                                        </td>
+                                        <td>
+                                            {% if "Win" in game.result.split(" - ")[0] %}
+                                            <a href="/player/{{ game.player1_tag_encoded }}">{{ game.player1 }}</a>
+                                            {% else %}
+                                            <a href="/player/{{ game.player2_tag_encoded }}">{{ game.player2 }}</a>
+                                            {% endif %}
+                                        </td>                                        
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="error-message">
+                            <p>No recent games found.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <h2 class="mb-3" id="players">Top Players</h2>
+                <div id="topPlayersContainer" class="row">
+                    {% if top_players %}
+                        {% for player in top_players %}
+                        <div class="col-md-6">
+                            <div class="card player-card" onclick="window.location.href='/player/{{ player.code_encoded }}'">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ player.name }}</h5>
+                                    <p class="card-text">
+                                        Games: {{ player.games }}<br>
+                                        Win Rate: {{ (player.win_rate * 100) | round(1) }}%
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="error-message">
+                            <p>No top players data available.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p>Slippi Stats - A tool for Super Smash Bros. Melee statistics</p>
+            <p class="small">Powered by the Slippi Stats Collector</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Character icon handling
+        function initializeCharacterIcons() {
+            // Define the character mapping based on the config
+            const characterMapping = {
+                "Mario": "Mario",
+                "Fox": "Fox",
+                "Captain Falcon": "Captain Falcon",
+                "Donkey Kong": "Donkey Kong",
+                "Kirby": "Kirby",
+                "Bowser": "Bowser",
+                "Link": "Link",
+                "Sheik": "Sheik", 
+                "Ness": "Ness",
+                "Peach": "Peach",
+                "Ice Climbers": "Ice Climbers",
+                "Yoshi": "Yoshi",
+                "Pikachu": "Pikachu",
+                "Samus": "Samus",
+                "Jigglypuff": "Jigglypuff",
+                "Mewtwo": "Mewtwo",
+                "Luigi": "Luigi",
+                "Marth": "Marth",
+                "Zelda": "Zelda",
+                "Young Link": "Young Link",
+                "Doctor Mario": "Doctor Mario",
+                "Dr. Mario": "Doctor Mario",
+                "Falco": "Falco",
+                "Pichu": "Pichu",
+                "Game & Watch": "Game & Watch",
+                "Mr. Game & Watch": "Game & Watch",
+                "Ganondorf": "Ganondorf",
+                "Roy": "Roy"
+            };
+
+            document.querySelectorAll('[data-character-name]').forEach(function(element) {
+                const characterName = element.getAttribute('data-character-name');
+                if (characterName && characterMapping[characterName]) {
+                    // Create the image element
+                    const img = document.createElement('img');
+                    img.src = `/static/icons/character/neutral ${characterMapping[characterName]}.png`;
+                    img.alt = characterName;
+                    img.width = 24;
+                    img.height = 24;
+                    img.className = 'character-icon';
+                    
+                    // Add error handling
+                    img.onerror = function() {
+                        // If image fails to load, replace with character initial
+                        this.style.display = 'none';
+                        const span = document.createElement('span');
+                        span.className = 'character-icon-fallback';
+                        span.textContent = characterName.charAt(0);
+                        // Add the character as data attribute for styling
+                        span.setAttribute('data-character', characterName.toLowerCase().replace(/ /g, '_'));
+                        this.parentNode.insertBefore(span, this.nextSibling);
+                    };
+                    
+                    // Add to the DOM
+                    element.appendChild(img);
+                } else {
+                    // Fallback for unknown characters
+                    const span = document.createElement('span');
+                    span.className = 'character-icon-fallback';
+                    span.textContent = characterName ? characterName.charAt(0) : '?';
+                    if (characterName) {
+                        span.setAttribute('data-character', characterName.toLowerCase().replace(/ /g, '_'));
+                    }
+                    element.appendChild(span);
+                }
+            });
+        }
+        
+        // Update last updated time
+        function updateLastUpdated() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.last_upload) {
+                        const date = new Date(data.last_upload);
+                        document.getElementById('lastUpdated').textContent = date.toLocaleString();
+                    } else {
+                        document.getElementById('lastUpdated').textContent = 'No data yet';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                    document.getElementById('lastUpdated').textContent = 'Error loading data';
+                });
+        }
+        
+        // Player search form
+        document.getElementById('playerSearchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const playerCode = document.getElementById('playerCodeInput').value.trim();
+            if (playerCode) {
+                // Encode the player tag for URL
+                const encodedTag = encodeURIComponent(playerCode);
+                window.location.href = `/player/${encodedTag}`;
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLastUpdated();
+            initializeCharacterIcons();
+        });
+    </script>
+</body>
+</html>
