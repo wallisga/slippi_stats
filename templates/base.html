@@ -8,15 +8,31 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     {% block extra_css %}{% endblock %}
     <style>
+        /* Fixed navbar styles */
+        body {
+            padding-top: 76px; /* Adjust based on your navbar height - Bootstrap default is around 56px, add some extra padding */
+        }
+        
         .navbar-search {
             max-width: 300px;
         }
+        
+        /* Ensure the navbar stays on top of other content */
+        .navbar {
+            z-index: 1030; /* Bootstrap's navbar z-index */
+        }
+        
+        /* Optional: Add a subtle shadow to make the fixed navbar more prominent */
+        .navbar-fixed-top {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
         {% block additional_styles %}{% endblock %}
     </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark {% block navbar_class %}{% endblock %}">
+    <!-- Fixed Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top navbar-fixed-top {% block navbar_class %}{% endblock %}">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">Slippi Stats</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -48,12 +64,12 @@
             </div>
         </div>
     </nav>
-
+    
     <!-- Main Content -->
     <div class="{% block content_container_class %}container mt-4{% endblock %}">
         {% block content %}{% endblock %}
     </div>
-
+    
     <!-- Footer -->
     <footer class="bg-dark text-white py-4 mt-5">
         <div class="container text-center">
@@ -61,20 +77,23 @@
             <p class="small">Powered by the Slippi Stats Collector</p>
         </div>
     </footer>
-
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     {% block scripts %}
     <script>
         // Player search form handler
-        document.getElementById('playerSearchForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const playerCode = document.getElementById('playerCodeInput').value.trim();
-            if (playerCode) {
-                // Encode the player tag for URL
-                const encodedTag = encodeURIComponent(playerCode);
-                window.location.href = `/player/${encodedTag}`;
-            }
-        });
+        const playerSearchForm = document.getElementById('playerSearchForm');
+        if (playerSearchForm) {
+            playerSearchForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const playerCode = document.getElementById('playerCodeInput').value.trim();
+                if (playerCode) {
+                    // Encode the player tag for URL
+                    const encodedTag = encodeURIComponent(playerCode);
+                    window.location.href = `/player/${encodedTag}`;
+                }
+            });
+        }
     </script>
     {% endblock %}
 </body>
