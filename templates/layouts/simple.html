@@ -3,6 +3,7 @@
 {% block layout_css %}
 <!-- Component CSS for simple pages -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/character-icons.css') }}">
 {% endblock %}
 
 {% block nav_extras %}
@@ -14,4 +15,5 @@
 
 {% block layout_js %}
 <!-- Component JS for simple pages (if any needed in future) -->
+<script src="{{ url_for('static', filename='js/components/character-icons.js') }}"></script>
 {% endblock %}

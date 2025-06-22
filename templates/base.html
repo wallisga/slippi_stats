@@ -11,7 +11,6 @@
     
     <!-- Base CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/character-icons.css') }}">
     
     <!-- Layout-specific CSS -->
     {% block layout_css %}{% endblock %}
@@ -72,7 +71,7 @@
     
     <!-- Base JavaScript -->
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/components/character-icons.js') }}"></script>
+
     
     <!-- Layout-specific JavaScript -->
     {% block layout_js %}{% endblock %}

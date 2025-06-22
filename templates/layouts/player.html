@@ -2,6 +2,7 @@
 
 {% block layout_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/character-icons.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
 {% endblock %}
 
@@ -33,6 +34,8 @@
 {% endblock %}
 
 {% block layout_js %}
+<!-- Component JS for simple pages (if any needed in future) -->
+<script src="{{ url_for('static', filename='js/components/character-icons.js') }}"></script>
 <!-- Chart.js for player statistics charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script src="{{ url_for('static', filename='js/components/player-dropdown.js') }}"></script>
