@@ -1,0 +1,147 @@
+{% extends "layouts/simple.html" %}
+
+{% block title %}Slippi Stats - Super Smash Bros. Melee Statistics{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/index.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="jumbotron">
+    <h1 class="display-4">Slippi Stats</h1>
+    <p class="lead">Analyze your Super Smash Bros. Melee gameplay with detailed statistics.</p>
+    <hr class="my-4">
+    <p>Track your performance across different characters, stages, and matchups to improve your game.</p>
+</div>
+
+<!-- Search Section -->
+<div class="search-container">
+    <form id="mainPageSearch" class="d-flex">
+        <input class="form-control me-2" type="search" placeholder="Enter player tag (e.g. EXO#196)" aria-label="Search" id="mainPlayerInput">
+        <button class="btn btn-primary" type="submit">Find Player</button>
+    </form>
+</div>
+
+<!-- Stats Overview -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total Games</h5>
+                <p class="display-4" id="totalGamesDisplay">{{ total_games }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Players</h5>
+                <p class="display-4" id="totalPlayersDisplay">{{ total_players }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Last Updated</h5>
+                <p class="h4" id="lastUpdated">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Games -->
+    <div class="col-md-7">
+        <h2 class="mb-3" id="recent-games-section">Recent Games</h2>
+        <div class="card stat-card">
+            <div class="card-body">
+                {% if recent_games %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Player 1</th>
+                                <th>Character</th>
+                                <th>Player 2</th>
+                                <th>Character</th>
+                                <th>Winner</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for game in recent_games %}
+                            <tr>
+                                <td class="game-time">{{ game.time }}</td>
+                                <td>
+                                    <a href="/player/{{ game.player1_tag_encoded }}" class="player-link">{{ game.player1 }}</a>
+                                </td>
+                                <td>
+                                    <span data-character-name="{{ game.character1 }}" class="character-container"></span>
+                                    {{ game.character1 }}
+                                </td>
+                                <td>
+                                    <a href="/player/{{ game.player2_tag_encoded }}" class="player-link">{{ game.player2 }}</a>
+                                </td>
+                                <td>
+                                    <span data-character-name="{{ game.character2 }}" class="character-container"></span>
+                                    {{ game.character2 }}
+                                </td>
+                                <td>
+                                    {% if "Win" in game.result.split(" - ")[0] %}
+                                    <a href="/player/{{ game.player1_tag_encoded }}" class="winner-link">{{ game.player1 }}</a>
+                                    {% else %}
+                                    <a href="/player/{{ game.player2_tag_encoded }}" class="winner-link">{{ game.player2 }}</a>
+                                    {% endif %}
+                                </td>                                        
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="no-data-message">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <span>No recent games found.</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Players -->
+    <div class="col-md-5">
+        <h2 class="mb-3" id="top-players-section">Top Players</h2>
+        <div id="topPlayersContainer" class="row">
+            {% if top_players %}
+                {% for player in top_players %}
+                <div class="col-md-6 mb-3">
+                    <div class="card player-card" onclick="window.location.href='/player/{{ player.code_encoded }}'">
+                        <div class="card-body">
+                            <h5 class="card-title player-name">{{ player.name }}</h5>
+                            <p class="card-text player-stats">
+                                <small class="text-muted">{{ player.code }}</small><br>
+                                Games: <strong>{{ player.games }}</strong><br>
+                                Win Rate: <strong class="win-rate">{{ (player.win_rate * 100) | round(1) }}%</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12">
+                    <div class="no-data-message">
+                        <i class="bi bi-exclamation-circle me-2"></i>
+                        <span>No top players data available.</span>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pages/index.js') }}"></script>
+{% endblock %}

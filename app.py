@@ -37,7 +37,7 @@ logger = logging.getLogger('SlippiServer')
 REGISTRATION_SECRET = "sl1pp1-s3rv3r-r3g1str4t10n-k3y-2025"  # Change this to your secret key
 API_KEYS_TABLE = "api_keys"
 TOKEN_EXPIRY_DAYS = 365  # API keys valid for 1 year
-DATABASE_PATH = '/opt/slippi-server/slippi_data.db'  # Path to the SQLite database
+DATABASE_PATH = 'slippi_data.db'  # Path to the SQLite database
 # Uncomment for testing on local Windows Machine
 # DATABASE_PATH = 'C:\\Users\\Gavin\\Code\\slippiscrape\\server\\slippi_data.db'
 GAMES_PER_PAGE = 20  # Number of games to show per page
@@ -736,108 +736,104 @@ def index():
     Returns:
         str: Rendered HTML template
     """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Count total games
+    cursor.execute("SELECT COUNT(*) FROM games")
+    total_games = cursor.fetchone()[0]
+    
+    # Log the total games count for debugging
+    logger.info(f"Current total games in database: {total_games}")
+    
+    # Use a better query for counting unique players
+    cursor.execute("""
+    WITH player_tags AS (
+        SELECT DISTINCT json_extract(p.value, '$.player_tag') as tag
+        FROM games, json_each(games.player_data) as p
+        WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
+          AND json_extract(p.value, '$.player_tag') != ''
+    )
+    SELECT COUNT(*) FROM player_tags
+    """)
+    total_players = cursor.fetchone()[0]
+    
+    # Get recent games with proper ordering
+    cursor.execute("""
+    SELECT start_time, player_data, game_id
+    FROM games
+    ORDER BY datetime(start_time) DESC
+    LIMIT 10
+    """)
+    recent_games_raw = cursor.fetchall()
+    
+    recent_games = []
+    for game in recent_games_raw:
+        player_data = json.loads(game['player_data'])
+        player1 = player_data[0] if len(player_data) > 0 else {"player_name": "Unknown", "character_name": "Unknown", "player_tag": "Unknown"}
+        player2 = player_data[1] if len(player_data) > 1 else {"player_name": "Unknown", "character_name": "Unknown", "player_tag": "Unknown"}
         
-        # Count total games
-        cursor.execute("SELECT COUNT(*) FROM games")
-        total_games = cursor.fetchone()[0]
-        
-        # Log the total games count for debugging
-        logger.info(f"Current total games in database: {total_games}")
-        
-        # Use a better query for counting unique players
-        cursor.execute("""
-        WITH player_tags AS (
-            SELECT DISTINCT json_extract(p.value, '$.player_tag') as tag
-            FROM games, json_each(games.player_data) as p
-            WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
-              AND json_extract(p.value, '$.player_tag') != ''
-        )
-        SELECT COUNT(*) FROM player_tags
-        """)
-        total_players = cursor.fetchone()[0]
-        
-        # Get recent games with proper ordering
-        cursor.execute("""
-        SELECT start_time, player_data, game_id
-        FROM games
-        ORDER BY datetime(start_time) DESC
-        LIMIT 10
-        """)
-        recent_games_raw = cursor.fetchall()
-        
-        recent_games = []
-        for game in recent_games_raw:
-            player_data = json.loads(game['player_data'])
-            player1 = player_data[0] if len(player_data) > 0 else {"player_name": "Unknown", "character_name": "Unknown", "player_tag": "Unknown"}
-            player2 = player_data[1] if len(player_data) > 1 else {"player_name": "Unknown", "character_name": "Unknown", "player_tag": "Unknown"}
-            
-            recent_games.append({
-                'time': game['start_time'],
-                'game_id': game['game_id'],
-                'player1': player1.get('player_name', 'Unknown'),
-                'player1_tag': player1.get('player_tag', 'Unknown'),
-                'player1_tag_encoded': encode_player_tag(player1.get('player_tag', 'Unknown')),
-                'character1': player1.get('character_name', 'Unknown'),
-                'player2': player2.get('player_name', 'Unknown'),
-                'player2_tag': player2.get('player_tag', 'Unknown'),
-                'player2_tag_encoded': encode_player_tag(player2.get('player_tag', 'Unknown')),
-                'character2': player2.get('character_name', 'Unknown'),
-                'result': f"{player1.get('result', 'Unknown')} - {player2.get('result', 'Unknown')}"
-            })
-        
-        # Use a smarter query to get player stats directly
-        cursor.execute("""
-        WITH player_data_expanded AS (
-            SELECT 
-                json_extract(p.value, '$.player_tag') as tag,
-                json_extract(p.value, '$.player_name') as name,
-                json_extract(p.value, '$.character_name') as character,
-                json_extract(p.value, '$.result') as result
-            FROM games, json_each(games.player_data) as p
-            WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
-              AND json_extract(p.value, '$.player_tag') != ''
-        ),
-        player_stats AS (
-            SELECT 
-                tag,
-                name,
-                COUNT(*) as games,
-                SUM(CASE WHEN result = 'Win' THEN 1 ELSE 0 END) as wins
-            FROM player_data_expanded
-            GROUP BY tag
-            ORDER BY games DESC
-            LIMIT 6
-        )
-        SELECT * FROM player_stats
-        """)
-        
-        top_players_rows = cursor.fetchall()
-        
-        top_players = []
-        for player in top_players_rows:
-            win_rate = player['wins'] / player['games'] if player['games'] > 0 else 0
-            top_players.append({
-                'code': player['tag'],
-                'code_encoded': encode_player_tag(player['tag']),
-                'name': player['name'],
-                'games': player['games'],
-                'win_rate': win_rate
-            })
-        
-        conn.close()
-        
-        return render_template('index.html', 
-                              total_games=total_games, 
-                              total_players=total_players,
-                              recent_games=recent_games,
-                              top_players=top_players)
-                              
-    except Exception as e:
-        logger.error(f"Error in index route: {str(e)}")
-        return render_template('error.html', error=str(e))
+        recent_games.append({
+            'time': game['start_time'],
+            'game_id': game['game_id'],
+            'player1': player1.get('player_name', 'Unknown'),
+            'player1_tag': player1.get('player_tag', 'Unknown'),
+            'player1_tag_encoded': encode_player_tag(player1.get('player_tag', 'Unknown')),
+            'character1': player1.get('character_name', 'Unknown'),
+            'player2': player2.get('player_name', 'Unknown'),
+            'player2_tag': player2.get('player_tag', 'Unknown'),
+            'player2_tag_encoded': encode_player_tag(player2.get('player_tag', 'Unknown')),
+            'character2': player2.get('character_name', 'Unknown'),
+            'result': f"{player1.get('result', 'Unknown')} - {player2.get('result', 'Unknown')}"
+        })
+    
+    # Use a smarter query to get player stats directly
+    cursor.execute("""
+    WITH player_data_expanded AS (
+        SELECT 
+            json_extract(p.value, '$.player_tag') as tag,
+            json_extract(p.value, '$.player_name') as name,
+            json_extract(p.value, '$.character_name') as character,
+            json_extract(p.value, '$.result') as result
+        FROM games, json_each(games.player_data) as p
+        WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
+          AND json_extract(p.value, '$.player_tag') != ''
+    ),
+    player_stats AS (
+        SELECT 
+            tag,
+            name,
+            COUNT(*) as games,
+            SUM(CASE WHEN result = 'Win' THEN 1 ELSE 0 END) as wins
+        FROM player_data_expanded
+        GROUP BY tag
+        ORDER BY games DESC
+        LIMIT 6
+    )
+    SELECT * FROM player_stats
+    """)
+    
+    top_players_rows = cursor.fetchall()
+    
+    top_players = []
+    for player in top_players_rows:
+        win_rate = player['wins'] / player['games'] if player['games'] > 0 else 0
+        top_players.append({
+            'code': player['tag'],
+            'code_encoded': encode_player_tag(player['tag']),
+            'name': player['name'],
+            'games': player['games'],
+            'win_rate': win_rate
+        })
+    
+    conn.close()
+    
+    return render_template('pages/index.html', 
+                          total_games=total_games, 
+                          total_players=total_players,
+                          recent_games=recent_games,
+                          top_players=top_players)
 
 @app.route('/player/<encoded_player_code>')
 def player_profile(encoded_player_code):
@@ -850,102 +846,104 @@ def player_profile(encoded_player_code):
     Returns:
         str: Rendered HTML template
     """
-    try:
-        # Decode the player code from URL
-        player_code = decode_player_tag(encoded_player_code)
-        logger.info(f"Requested player profile: '{player_code}' (encoded as '{encoded_player_code}')")
-        
-        # Get all games for this player with proper ordering
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get all games with descending time order
-        cursor.execute("""
-        SELECT game_id, start_time, last_frame, stage_id, player_data 
-        FROM games 
-        ORDER BY datetime(start_time) DESC
-        """)
-        games_raw = cursor.fetchall()
-        conn.close()
-        
-        # Process the games data
-        games = []
-        for game in games_raw:
-            try:
-                player_data = json.loads(game['player_data'])
-                
-                # Find the target player's data
-                player_info = None
-                opponent_info = None
-                
-                for player in player_data:
-                    if player.get('player_tag') == player_code:
-                        player_info = player
-                
-                # Skip games where the player wasn't found
-                if not player_info:
-                    continue
-                    
-                # Find the opponent
-                for player in player_data:
-                    if player != player_info:
-                        opponent_info = player
-                        break
-                
-                # Skip games without an opponent
-                if not opponent_info:
-                    continue
-                    
-                games.append({
-                    'game_id': game['game_id'],
-                    'start_time': game['start_time'],
-                    'last_frame': game['last_frame'],
-                    'game_duration_seconds': game['last_frame'] / 60,
-                    'stage_id': game['stage_id'],
-                    'player': player_info,
-                    'opponent': opponent_info,
-                    'result': player_info.get('result', 'Unknown')
-                })
-            except Exception as e:
-                logger.error(f"Error processing game: {str(e)}")
-                continue
-        
-        logger.info(f"Found {len(games)} games for player '{player_code}'")
-        
-        if len(games) == 0:
-            # Try flexible matching
-            potential_matches = find_player_with_flexible_matching(player_code)
+
+    # Decode the player code from URL
+    player_code = decode_player_tag(encoded_player_code)
+    logger.info(f"Requested player profile: '{player_code}' (encoded as '{encoded_player_code}')")
+    
+    # Get all games for this player with proper ordering
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get all games with descending time order
+    cursor.execute("""
+    SELECT game_id, start_time, last_frame, stage_id, player_data 
+    FROM games 
+    ORDER BY datetime(start_time) DESC
+    """)
+    games_raw = cursor.fetchall()
+    conn.close()
+    
+    # Process the games data
+    games = []
+    for game in games_raw:
+        try:
+            player_data = json.loads(game['player_data'])
             
-            if potential_matches:
-                # If we have an exact case-insensitive match, redirect to it
-                exact_case_insensitive = [m for m in potential_matches if m['match_type'] == 'case_insensitive']
-                if exact_case_insensitive:
-                    correct_tag = exact_case_insensitive[0]['tag']
-                    logger.info(f"Redirecting to case-correct tag: '{correct_tag}'")
-                    return redirect(f"/player/{encode_player_tag(correct_tag)}")
-                    
-                # If we have exact matches but no games were found, something else is wrong
-                exact_matches = [m for m in potential_matches if m['match_type'] == 'exact']
-                if exact_matches:
-                    logger.error(f"Found {len(exact_matches)} exact matches for '{player_code}' but no games were found")
-                    
-            abort(404, description=f"Player '{player_code}' was found but no games could be loaded. Please check the debug page for a list of available players.")
+            # Find the target player's data
+            player_info = None
+            opponent_info = None
+            
+            for player in player_data:
+                if player.get('player_tag') == player_code:
+                    player_info = player
+            
+            # Skip games where the player wasn't found
+            if not player_info:
+                continue
+                
+            # Find the opponent
+            for player in player_data:
+                if player != player_info:
+                    opponent_info = player
+                    break
+            
+            # Skip games without an opponent
+            if not opponent_info:
+                continue
+                
+            games.append({
+                'game_id': game['game_id'],
+                'start_time': game['start_time'],
+                'last_frame': game['last_frame'],
+                'game_duration_seconds': game['last_frame'] / 60,
+                'stage_id': game['stage_id'],
+                'player': player_info,
+                'opponent': opponent_info,
+                'result': player_info.get('result', 'Unknown')
+            })
+        except Exception as e:
+            logger.error(f"Error processing game: {str(e)}")
+            continue
+    
+    logger.info(f"Found {len(games)} games for player '{player_code}'")
+    
+    if len(games) == 0:
+        # Try flexible matching
+        potential_matches = find_player_with_flexible_matching(player_code)
         
-        # Calculate player statistics
-        stats = calculate_player_stats(games)
-        
-        # Get recent games (last 20)
-        recent_games = games[:GAMES_PER_PAGE]
-        
-        return render_template('player.html', 
-                              player_code=player_code,
-                              encoded_player_code=encoded_player_code,
-                              stats=stats,
-                              recent_games=recent_games)
-                              
-    except Exception as e:
-        logger.error(f"Error in player profile route: {str(e)}")
-        return render_template('error.html', error=str(e))
+        if potential_matches:
+            # If we have an exact case-insensitive match, redirect to it
+            exact_case_insensitive = [m for m in potential_matches if m['match_type'] == 'case_insensitive']
+            if exact_case_insensitive:
+                correct_tag = exact_case_insensitive[0]['tag']
+                logger.info(f"Redirecting to case-correct tag: '{correct_tag}'")
+                return redirect(f"/player/{encode_player_tag(correct_tag)}")
+                
+            # If we have exact matches but no games were found, something else is wrong
+            exact_matches = [m for m in potential_matches if m['match_type'] == 'exact']
+            if exact_matches:
+                logger.error(f"Found {len(exact_matches)} exact matches for '{player_code}' but no games were found")
+                
+        abort(404, description=f"Player '{player_code}' was found but no games could be loaded. Please check the debug page for a list of available players.")
+    
+    # Calculate player statistics
+    stats = calculate_player_stats(games)
+    
+    # Get recent games (last 20)
+    recent_games = games[:GAMES_PER_PAGE]
+    
+    # Get character list for dropdown navigation
+    character_list = list(set(g['player']['character_name'] for g in games))
+    
+    # Updated to use the new template path - simple page in pages directory
+    return render_template('pages/player_basic.html', 
+                          player_code=player_code,
+                          encoded_player_code=encoded_player_code,
+                          stats=stats,
+                          recent_games=recent_games,
+                          character_list=character_list)
+                          
 
 @app.route('/player/<encoded_player_code>/detailed')
 def player_detailed(encoded_player_code):
@@ -958,18 +956,15 @@ def player_detailed(encoded_player_code):
     Returns:
         str: Rendered HTML template
     """
-    try:
-        # Decode the player code from URL
-        player_code = decode_player_tag(encoded_player_code)
-        logger.info(f"Requested detailed profile for: '{player_code}' (encoded as '{encoded_player_code}')")
-        
-        return render_template('player_detailed.html', 
-                              player_code=player_code,
-                              encoded_player_code=encoded_player_code)
-                              
-    except Exception as e:
-        logger.error(f"Error in detailed player route: {str(e)}")
-        return render_template('error.html', error=str(e))
+
+    # Decode the player code from URL
+    player_code = decode_player_tag(encoded_player_code)
+    logger.info(f"Requested detailed profile for: '{player_code}' (encoded as '{encoded_player_code}')")
+    
+    return render_template('pages/player_detailed.html', 
+                          player_code=player_code,
+                          encoded_player_code=encoded_player_code)
+
 
 @app.route('/players')
 def players():
@@ -979,121 +974,71 @@ def players():
     Returns:
         str: Rendered HTML template with player list
     """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Use a better query to get player data directly
-        cursor.execute("""
-        WITH player_data_expanded AS (
-            SELECT 
-                json_extract(p.value, '$.player_tag') as tag,
-                json_extract(p.value, '$.player_name') as name,
-                json_extract(p.value, '$.character_name') as character
-            FROM games, json_each(games.player_data) as p
-            WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
-              AND json_extract(p.value, '$.player_tag') != ''
-        ),
-        player_char_counts AS (
-            SELECT 
-                tag, 
-                name,
-                character,
-                COUNT(*) as count
-            FROM player_data_expanded
-            GROUP BY tag, character
-        ),
-        player_totals AS (
-            SELECT 
-                tag,
-                name,
-                SUM(count) as total_count
-            FROM player_char_counts
-            GROUP BY tag
-        ),
-        player_characters AS (
-            SELECT 
-                pcc.tag,
-                GROUP_CONCAT(pcc.character) as characters
-            FROM player_char_counts pcc
-            GROUP BY pcc.tag
-        )
-        SELECT 
-            pt.tag, 
-            pt.name, 
-            pc.characters, 
-            pt.total_count
-        FROM player_totals pt
-        JOIN player_characters pc ON pt.tag = pc.tag
-        ORDER BY pt.total_count DESC
-        """)
-        
-        players_rows = cursor.fetchall()
-        
-        # Convert to list for template rendering
-        players_list = []
-        for row in players_rows:
-            players_list.append({
-                'tag': row['tag'],
-                'encoded_tag': encode_player_tag(row['tag']),
-                'name': row['name'],
-                'characters': row['characters'],
-                'count': row['total_count']
-            })
-        
-        conn.close()
-        
-        return render_template('players.html', players=players_list)
-        
-    except Exception as e:
-        logger.error(f"Error in debug players route: {str(e)}")
-        return render_template('error.html', error=str(e))
 
-@app.route('/player/<encoded_player_code>/character/<encoded_character_name>')
-def player_character(encoded_player_code, encoded_character_name):
-    """
-    Character-specific player profile page showing stats for a specific character.
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    Args:
-        encoded_player_code (str): URL-encoded player tag
-        encoded_character_name (str): URL-encoded character name
-        
-    Returns:
-        str: Rendered HTML template
-    """
-    try:
-        # Decode the player code and character name from URL
-        player_code = decode_player_tag(encoded_player_code)
-        character_name = decode_player_tag(encoded_character_name)
-        logger.info(f"Requested character profile for: '{player_code}' playing '{character_name}'")
-        
-        # Get all games for this player with this character
-        games = get_player_games(player_code)
-        character_games = [g for g in games if g['player']['character_name'] == character_name]
-        
-        if len(character_games) == 0:
-            abort(404, description=f"No games found for '{player_code}' playing '{character_name}'")
-        
-        # Calculate character statistics
-        character_stats = calculate_character_stats(character_games)
-        
-        # Get recent games with this character
-        recent_games = character_games[:GAMES_PER_PAGE]
-        
-        # Get all characters played by this player (for dropdown)
-        character_list = list(set(g['player']['character_name'] for g in games))
-        
-        return render_template('player_character.html',
-                              player_code=player_code,
-                              character_name=character_name,
-                              character_stats=character_stats,
-                              recent_games=recent_games,
-                              character_list=character_list,
-                              total_games=len(games))
-                              
-    except Exception as e:
-        logger.error(f"Error in character profile route: {str(e)}")
-        return render_template('error.html', error=str(e))        
+    # Use a better query to get player data directly
+    cursor.execute("""
+    WITH player_data_expanded AS (
+        SELECT 
+            json_extract(p.value, '$.player_tag') as tag,
+            json_extract(p.value, '$.player_name') as name,
+            json_extract(p.value, '$.character_name') as character
+        FROM games, json_each(games.player_data) as p
+        WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
+          AND json_extract(p.value, '$.player_tag') != ''
+    ),
+    player_char_counts AS (
+        SELECT 
+            tag, 
+            name,
+            character,
+            COUNT(*) as count
+        FROM player_data_expanded
+        GROUP BY tag, character
+    ),
+    player_totals AS (
+        SELECT 
+            tag,
+            name,
+            SUM(count) as total_count
+        FROM player_char_counts
+        GROUP BY tag
+    ),
+    player_characters AS (
+        SELECT 
+            pcc.tag,
+            GROUP_CONCAT(pcc.character) as characters
+        FROM player_char_counts pcc
+        GROUP BY pcc.tag
+    )
+    SELECT 
+        pt.tag, 
+        pt.name, 
+        pc.characters, 
+        pt.total_count
+    FROM player_totals pt
+    JOIN player_characters pc ON pt.tag = pc.tag
+    ORDER BY pt.total_count DESC
+    """)
+    
+    players_rows = cursor.fetchall()
+    
+    # Convert to list for template rendering
+    players_list = []
+    for row in players_rows:
+        players_list.append({
+            'tag': row['tag'],
+            'encoded_tag': encode_player_tag(row['tag']),
+            'name': row['name'],
+            'characters': row['characters'],
+            'count': row['total_count']
+        })
+    
+    conn.close()
+    
+    return render_template('pages/players.html', players=players_list)
 
 # =============================================================================
 # API Routes
@@ -1731,7 +1676,7 @@ def download_page():
     release_date = "May 4, 2025"
     download_url = "/download/SlippiMonitor.msi"
     
-    return render_template('download.html', 
+    return render_template('pages/download.html', 
                           version=version,
                           release_date=release_date,
                           download_url=download_url)
@@ -1764,7 +1709,7 @@ def how_to_page():
     Returns:
         str: Rendered HTML template
     """
-    return render_template('how-to.html')            
+    return render_template('pages/how_to.html')            
 
 # =============================================================================
 # Error Handlers
@@ -1773,44 +1718,51 @@ def how_to_page():
 @app.errorhandler(400)
 def bad_request(error):
     """Handle 400 Bad Request errors"""
-    return jsonify({
-        "status": "error",
-        "message": str(error.description)
-    }), 400
+    return render_template('pages/error_status.html', 
+                          status_code=400,
+                          error_description=str(error.description)), 400
 
 @app.errorhandler(401)
 def unauthorized(error):
     """Handle 401 Unauthorized errors"""
-    return jsonify({
-        "status": "error",
-        "message": str(error.description)
-    }), 401
+    return render_template('pages/error_status.html', 
+                          status_code=401,
+                          error_description=str(error.description)), 401
 
 @app.errorhandler(403)
 def forbidden(error):
     """Handle 403 Forbidden errors"""
-    return jsonify({
-        "status": "error",
-        "message": str(error.description)
-    }), 403
+    return render_template('pages/error_status.html', 
+                          status_code=403,
+                          error_description=str(error.description)), 403
 
 @app.errorhandler(404)
-def page_not_found(e):
-    """Handle 404 Not Found errors with a template"""
-    return render_template('404.html', error=e.description), 404   
+def page_not_found(error):
+    """Handle 404 Not Found errors with enhanced template"""
+    return render_template('pages/error_status.html', 
+                          status_code=404,
+                          error_description=str(error.description)), 404
 
 @app.errorhandler(429)
 def too_many_requests(error):
     """Handle 429 Too Many Requests errors"""
-    return jsonify({
-        "status": "error",
-        "message": str(error.description)
-    }), 429
+    return render_template('pages/error_status.html', 
+                          status_code=429,
+                          error_description=str(error.description)), 429
 
 @app.errorhandler(500)
-def server_error(e):
-    """Handle 500 Internal Server Error with a template"""
-    return render_template('500.html', error=str(e)), 500 
+def server_error(error):
+    """Handle 500 Internal Server Error with enhanced template"""
+    return render_template('pages/error_status.html', 
+                          status_code=500,
+                          error_description=str(error)), 500
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """Handle all other exceptions with the exception template"""
+    logger.error(f"Unhandled exception: {str(error)}")
+    return render_template('pages/error_exception.html', 
+                          error=str(error)), 500
 
 # =============================================================================
 # Application Initialization

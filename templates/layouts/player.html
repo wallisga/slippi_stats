@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block layout_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle active" href="#" id="playerDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Players
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="playerDropdown">
+        <li><a class="dropdown-item" href="/players">Player Index</a></li>
+        {% if player_code %}
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">{{ player_code }}</h6></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="basic" href="#">Basic Profile</a></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="detailed" data-suffix="/detailed" href="#">Detailed Stats</a></li>
+        {% endif %}
+    </ul>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
+</li>
+{% endblock %}
+
+{% block nav_extras %}
+<form class="d-flex navbar-search" id="playerSearchForm">
+    <input class="form-control me-2" type="search" placeholder="Find Player..." aria-label="Search" id="playerCodeInput">
+    <button class="btn btn-outline-light" type="submit"><i class="bi bi-search"></i></button>
+</form>
+{% endblock %}
+
+{% block layout_js %}
+<!-- Chart.js for player statistics charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/components/player-dropdown.js') }}"></script>
+{% endblock %}

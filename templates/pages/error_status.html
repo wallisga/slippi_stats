@@ -1,0 +1,123 @@
+{% extends "layouts/error.html" %}
+
+{% block title %}{{ status_code }} Error | Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/error.css') }}">
+{% endblock %}
+
+{% block error_content %}
+<div class="card">
+    <div class="card-body error-container">
+        <div class="error-icon">
+            {% if status_code == 404 %}
+                <i class="bi bi-exclamation-circle"></i>
+            {% elif status_code == 403 %}
+                <i class="bi bi-shield-exclamation"></i>
+            {% elif status_code == 500 %}
+                <i class="bi bi-exclamation-triangle"></i>
+            {% elif status_code == 429 %}
+                <i class="bi bi-stopwatch"></i>
+            {% else %}
+                <i class="bi bi-exclamation-triangle"></i>
+            {% endif %}
+        </div>
+        
+        <h1 class="display-4">
+            {% if status_code == 404 %}
+                {% if 'player' in error_description|lower %}
+                    Player Not Found
+                {% else %}
+                    Page Not Found
+                {% endif %}
+            {% elif status_code == 403 %}
+                Access Forbidden
+            {% elif status_code == 500 %}
+                Something Went Wrong
+            {% elif status_code == 429 %}
+                Too Many Requests
+            {% else %}
+                Error {{ status_code }}
+            {% endif %}
+        </h1>
+        
+        <div class="error-message">
+            {% if status_code == 404 %}
+                {% if 'player' in error_description|lower %}
+                    <p class="lead">The player tag you're looking for doesn't exist in our database.</p>
+                    <p>{{ error_description }}</p>
+                    <p>Player tags are case sensitive and should include the formatting used in-game (e.g., "TEKT#518").</p>
+                {% else %}
+                    <p class="lead">The page you're looking for doesn't exist.</p>
+                    <p>{{ error_description }}</p>
+                    <p>The URL may be incorrect or the page may have been moved.</p>
+                {% endif %}
+            {% elif status_code == 403 %}
+                <p class="lead">You don't have permission to access this resource.</p>
+                <p>{{ error_description }}</p>
+            {% elif status_code == 500 %}
+                <p class="lead">We encountered an error while processing your request.</p>
+                {% if error_description %}
+                <div class="alert alert-danger">
+                    <p>{{ error_description }}</p>
+                </div>
+                {% endif %}
+                <p>Please try again later or return to the home page.</p>
+            {% elif status_code == 429 %}
+                <p class="lead">You're making too many requests.</p>
+                <p>{{ error_description }}</p>
+                <p>Please wait a moment before trying again.</p>
+            {% else %}
+                <p class="lead">An error occurred while processing your request.</p>
+                {% if error_description %}
+                <p>{{ error_description }}</p>
+                {% endif %}
+            {% endif %}
+        </div>
+        
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary btn-lg">
+                <i class="bi bi-house-door me-2"></i>Return to Home
+            </a>
+            
+            {% if status_code != 404 %}
+            <button class="btn btn-outline-secondary btn-lg" onclick="window.history.back()">
+                <i class="bi bi-arrow-left me-2"></i>Go Back
+            </button>
+            {% endif %}
+            
+            {% if status_code == 404 and 'player' in error_description|lower %}
+            <a href="/players" class="btn btn-outline-primary btn-lg">
+                <i class="bi bi-people me-2"></i>Browse Players
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if status_code == 404 and 'player' in error_description|lower %}
+<div class="card mt-4">
+    <div class="card-body">
+        <h5 class="card-title">
+            <i class="bi bi-lightbulb me-2"></i>Searching Tips
+        </h5>
+        <ul class="tips-list">
+            <li>Make sure to include any special characters like # and numbers</li>
+            <li>Check the capitalization of your player tag</li>
+            <li>Try searching for a different variation of your tag</li>
+            <li>Only players with recorded matches will appear in the database</li>
+        </ul>
+        
+        <div class="mt-3">
+            <a href="/players" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-search me-1"></i>Search All Players
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pages/error.js') }}"></script>
+{% endblock %}

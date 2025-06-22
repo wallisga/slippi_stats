@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block layout_css %}
+<!-- Component CSS for simple pages -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+{% endblock %}
+
+{% block nav_extras %}
+<form class="d-flex navbar-search" id="playerSearchForm">
+    <input class="form-control me-2" type="search" placeholder="Find Player..." aria-label="Search" id="playerCodeInput">
+    <button class="btn btn-outline-light" type="submit"><i class="bi bi-search"></i></button>
+</form>
+{% endblock %}
+
+{% block layout_js %}
+<!-- Component JS for simple pages (if any needed in future) -->
+{% endblock %}

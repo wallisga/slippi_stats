@@ -1,0 +1,99 @@
+/* Character Icon Components */
+
+.character-icon {
+    margin-right: 8px;
+    vertical-align: middle;
+    border-radius: 4px;
+}
+
+.character-icon-fallback {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-color: #f8f9fa;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    text-align: center;
+    line-height: 24px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.character-container {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Character-specific fallback colors */
+.character-icon-fallback[data-character="fox"] {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.character-icon-fallback[data-character="falco"] {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.character-icon-fallback[data-character="marth"] {
+    background-color: #0dcaf0;
+    color: white;
+}
+
+.character-icon-fallback[data-character="captain_falcon"] {
+    background-color: #dc3545;
+    color: white;
+}
+
+.character-icon-fallback[data-character="jigglypuff"] {
+    background-color: #d63384;
+    color: white;
+}
+
+.character-icon-fallback[data-character="peach"] {
+    background-color: #ffc107;
+}
+
+.character-icon-fallback[data-character="sheik"] {
+    background-color: #6f42c1;
+    color: white;
+}
+
+.character-icon-fallback[data-character="ice_climbers"] {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* Large character icons for banners */
+.character-banner .character-icon,
+.character-badge .character-icon {
+    width: 96px;
+    height: 96px;
+    margin-right: 16px;
+}
+
+.character-banner .character-icon-fallback,
+.character-badge .character-icon-fallback {
+    width: 96px;
+    height: 96px;
+    line-height: 96px;
+    font-size: 36px;
+    margin: 0 auto 15px auto;
+    display: block;
+}
+
+/* Character banner component */
+.character-banner {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.character-badge {
+    text-align: center;
+    margin-bottom: 15px;
+}

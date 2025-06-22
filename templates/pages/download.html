@@ -1,0 +1,66 @@
+{% extends "layouts/simple.html" %}
+
+{% block title %}Download Slippi Stats Client | Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/download.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card download-card">
+            <div class="card-body text-center p-5">
+                <h1 class="card-title mb-4">Slippi Stats Client</h1>
+                <p class="card-text lead mb-4">Download the Slippi Stats Client to automatically upload your game replays and track your stats.</p>
+                
+                <div class="mb-4">
+                    <span class="badge bg-primary version-badge">Version {{ version }}</span>
+                    <span class="text-muted">Released {{ release_date }}</span>
+                </div>
+                
+                <a href="{{ download_url }}" class="btn btn-primary btn-lg download-btn" id="downloadButton">
+                    <i class="bi bi-download me-2"></i>Download Installer
+                </a>
+            </div>
+        </div>
+        
+        <div class="card download-card mt-4">
+            <div class="card-body p-4">
+                <h3 class="card-title">About Slippi Stats Client</h3>
+                <p>The Slippi Stats Client is a lightweight application that runs in your system tray and automatically uploads your Slippi replay files to our server for analysis.</p>
+                
+                <div class="features-list">
+                    <div class="d-flex align-items-start mb-3">
+                        <i class="bi bi-cloud-upload fs-4"></i>
+                        <div>
+                            <h5>Automatic Uploads</h5>
+                            <p>Your replay files are automatically uploaded in the background so your stats are always up to date.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-start mb-3">
+                        <i class="bi bi-gear fs-4"></i>
+                        <div>
+                            <h5>Configurable Settings</h5>
+                            <p>Set your own replay directory, upload interval, and more through the settings panel.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-start mb-3">
+                        <i class="bi bi-shield-check fs-4"></i>
+                        <div>
+                            <h5>Lightweight & Secure</h5>
+                            <p>Runs silently in your system tray with minimal resource usage and secure data transfer.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pages/download.js') }}"></script>
+{% endblock %}

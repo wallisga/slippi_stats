@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block layout_css %}
+<!-- Component CSS for error pages -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+{% endblock %}
+
+{% block nav_extras %}
+<!-- Simplified navbar for error pages - no search -->
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            {% block error_content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block layout_js %}
+<!-- Component JS for error pages (if needed) -->
+{% endblock %}

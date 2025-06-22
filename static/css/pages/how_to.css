@@ -1,0 +1,326 @@
+/* How-To Page Specific Styles */
+
+.page-header {
+    color: #212529;
+    font-weight: 700;
+    border-bottom: 3px solid #0d6efd;
+    padding-bottom: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Instruction Cards */
+.instruction-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    margin-bottom: 1.5rem;
+    border: 1px solid #dee2e6;
+}
+
+.instruction-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+.instruction-card .card-title {
+    color: #212529;
+    font-weight: 600;
+    border-bottom: 2px solid #f8f9fa;
+    padding-bottom: 0.5rem;
+}
+
+.instruction-card .card-title i {
+    font-size: 1.2rem;
+}
+
+/* Step Components */
+.step-container {
+    display: flex;
+    margin-bottom: 2rem;
+    align-items: flex-start;
+}
+
+.step-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-right: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-content h5 {
+    color: #212529;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.step-content p {
+    color: #495057;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+/* Lists Styling */
+.settings-list,
+.options-list,
+.troubleshooting-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1rem;
+}
+
+.settings-list li,
+.troubleshooting-list li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    color: #495057;
+    line-height: 1.5;
+}
+
+.settings-list li::before,
+.troubleshooting-list li::before {
+    content: "•";
+    color: #0d6efd;
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+    font-size: 1.2rem;
+}
+
+.options-list li {
+    padding: 0.75rem 0;
+    color: #495057;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+}
+
+/* Code and Path Styling */
+.path-code {
+    background-color: #f8f9fa;
+    color: #e83e8c;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem;
+}
+
+/* Status Indicators */
+.status-indicator {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.status-indicator.success {
+    background-color: #d1edff;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+}
+
+/* Screenshots */
+.screenshot {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    max-width: 100%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.screenshot:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Alert Styling */
+.alert-setup {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #0d6efd;
+    border-radius: 8px;
+}
+
+.alert-setup h4 {
+    color: #0d6efd;
+    font-weight: 600;
+}
+
+.alert-info {
+    border-radius: 8px;
+    border: none;
+    background-color: #cff4fc;
+    color: #055160;
+}
+
+.alert-success {
+    border-radius: 8px;
+    border: none;
+    background-color: #d1edff;
+    color: #0f5132;
+}
+
+/* Troubleshooting Section */
+.troubleshooting-section {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+    height: 100%;
+}
+
+.troubleshooting-section h5 {
+    color: #212529;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+/* CTA Buttons */
+.cta-button {
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.btn-outline-secondary.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .step-container {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .step-number {
+        margin-right: 0;
+        margin-bottom: 1rem;
+        align-self: center;
+    }
+    
+    .troubleshooting-section {
+        margin-bottom: 1rem;
+    }
+    
+    .cta-button {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    .btn.ms-3 {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+    
+    .screenshot {
+        margin: 1rem 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-header {
+        font-size: 1.75rem;
+    }
+    
+    .instruction-card .card-body {
+        padding: 2rem 1rem;
+    }
+    
+    .step-number {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+    
+    .step-content h5 {
+        font-size: 1.1rem;
+    }
+    
+    .troubleshooting-section {
+        padding: 1rem;
+    }
+    
+    .options-list li {
+        font-size: 0.9rem;
+    }
+    
+    .settings-list li,
+    .troubleshooting-list li {
+        font-size: 0.9rem;
+        padding-left: 1rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .instruction-card {
+        box-shadow: none;
+        border: 1px solid #000;
+        break-inside: avoid;
+    }
+    
+    .cta-button {
+        display: none;
+    }
+    
+    .screenshot {
+        max-width: 80%;
+        break-inside: avoid;
+    }
+    
+    .step-container {
+        break-inside: avoid;
+    }
+}
+
+/* Animation for step numbers */
+@keyframes fadeInStep {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.step-number {
+    animation: fadeInStep 0.3s ease-out;
+}
+
+/* Hover effects for better interactivity */
+.step-container:hover .step-number {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+}
+
+.options-list li:hover {
+    background-color: #f8f9fa;
+    padding-left: 1rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
