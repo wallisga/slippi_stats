@@ -30,10 +30,6 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Home</a>
-                    </li>
-                    
                     {% block nav_items %}
                     <li class="nav-item">
                         <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
