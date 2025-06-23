@@ -6,14 +6,47 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/character_icons.css') }}">
 {% endblock %}
 
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if '/how-to' in request.path %}active{% endif %}" href="/how-to">How-To</a>
+</li>
+{% endblock %}
+
 {% block nav_extras %}
+{% if has_player_search %}
 <form class="d-flex navbar-search" id="playerSearchForm">
     <input class="form-control me-2" type="search" placeholder="Find Player..." aria-label="Search" id="playerCodeInput">
     <button class="btn btn-outline-light" type="submit"><i class="bi bi-search"></i></button>
 </form>
+{% endif %}
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-4">
+    <!-- Page-specific data as JSON for JavaScript components -->
+    {% if layout_type or page_type %}
+    <script type="application/json" id="page-data">
+    {
+        "layoutType": {{ (layout_type | tojson) if layout_type is defined else '"simple"' }},
+        "pageType": {{ (page_type | tojson) if page_type is defined else '""' }},
+        "hasPlayerSearch": {{ (has_player_search | tojson) if has_player_search is defined else 'true' }},
+        "appStats": {{ (app_stats | tojson) if app_stats is defined else '{}' }}
+    }
+    </script>
+    {% endif %}
+    
+    {% block content %}{% endblock %}
+</div>
 {% endblock %}
 
 {% block layout_js %}
-<!-- Component JS for simple pages (if any needed in future) -->
+<!-- Component JS for simple pages -->
 <script src="{{ url_for('static', filename='js/components/character_icons.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/search.js') }}"></script>
 {% endblock %}

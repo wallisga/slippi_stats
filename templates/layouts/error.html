@@ -3,22 +3,169 @@
 {% block layout_css %}
 <!-- Component CSS for error pages -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
+<style>
+/* Error-specific styles */
+.error-container {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.error-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.error-code {
+    font-size: 6rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.error-title {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.error-description {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    color: #6c757d;
+}
+
+@media (max-width: 768px) {
+    .error-code {
+        font-size: 4rem;
+    }
+    
+    .error-title {
+        font-size: 1.5rem;
+    }
+    
+    .error-description {
+        font-size: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link" href="/players">Players</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/download">Download</a>
+</li>
 {% endblock %}
 
 {% block nav_extras %}
-<!-- Simplified navbar for error pages - no search -->
+<!-- Minimal navbar for error pages - no search -->
 {% endblock %}
 
 {% block content_wrapper %}
-<div class="container mt-5">
+<div class="container mt-4">
+    <!-- Error page data as JSON for JavaScript components -->
+    <script type="application/json" id="error-data">
+    {
+        "layoutType": {{ (layout_type | tojson) if layout_type is defined else '"error"' }},
+        "statusCode": {{ (status_code | tojson) if status_code is defined else '500' }},
+        "errorType": {{ (error_type | tojson) if error_type is defined else '"secondary"' }},
+        "showHomeLink": {{ (show_home_link | tojson) if show_home_link is defined else 'true' }},
+        "showBackLink": {{ (show_back_link | tojson) if show_back_link is defined else 'false' }}
+    }
+    </script>
+    
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            {% block error_content %}{% endblock %}
+            <div class="error-container">
+                <div class="text-center">
+                    <!-- Error Icon -->
+                    <div class="error-icon text-{{ error_type }}">
+                        <i class="{{ error_icon }}"></i>
+                    </div>
+                    
+                    <!-- Error Code -->
+                    <div class="error-code text-{{ error_type }}">
+                        {{ status_code }}
+                    </div>
+                    
+                    <!-- Error Title -->
+                    <h1 class="error-title">
+                        {{ error_title }}
+                    </h1>
+                    
+                    <!-- Error Description -->
+                    <p class="error-description">
+                        {{ error_description }}
+                    </p>
+                    
+                    <!-- Error-specific content -->
+                    {% block error_content %}{% endblock %}
+                    
+                    <!-- Standard error suggestions -->
+                    {% if suggestion %}
+                    <div class="alert alert-{{ error_type }} alert-dismissible" role="alert">
+                        <i class="{{ error_icon }} me-2"></i>{{ suggestion }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Action buttons -->
+                    <div class="d-flex gap-3 justify-content-center flex-wrap">
+                        {% if show_home_link %}
+                        <a href="/" class="btn btn-primary">
+                            <i class="bi bi-house me-2"></i>Return Home
+                        </a>
+                        {% endif %}
+                        
+                        {% if show_back_link %}
+                        <button onclick="history.back()" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>Go Back
+                        </button>
+                        {% endif %}
+                        
+                        <a href="/players" class="btn btn-outline-primary">
+                            <i class="bi bi-people me-2"></i>Browse Players
+                        </a>
+                    </div>
+                    
+                    <!-- Technical details for development -->
+                    {% if technical_details and config.DEBUG %}
+                    <details class="mt-4">
+                        <summary class="btn btn-link text-muted">Technical Details</summary>
+                        <pre class="text-start mt-2 p-3 bg-light border rounded">{{ technical_details }}</pre>
+                    </details>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block layout_js %}
-<!-- Component JS for error pages (if needed) -->
+<!-- Component JS for error pages -->
+<script>
+// Error page specific JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-dismiss alerts after 10 seconds
+    const alerts = document.querySelectorAll('.alert-dismissible');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 10000);
+    });
+    
+    // Add some error page analytics or tracking here if needed
+    console.log('Error page loaded:', {
+        statusCode: {{ status_code | tojson }},
+        errorType: {{ error_type | tojson }},
+        path: window.location.pathname
+    });
+});
+</script>
 {% endblock %}
