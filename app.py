@@ -5,6 +5,13 @@ PHASE 1 REFACTORING COMPLETED:
 - All database operations moved to database.py
 - Clean separation of concerns
 - Maintained backward compatibility with existing templates
+
+PHASE 2 REFACTORING IN PROGRESS:
+- Extract route logic into dedicated functions
+- Consolidate common functionality
+- Prepare for future module separation
+- CLEANUP: Removed unused functions and fixed handler usage
+- UTILS: Moved utilities to utils.py module
 """
 
 # =============================================================================
@@ -12,7 +19,6 @@ PHASE 1 REFACTORING COMPLETED:
 # =============================================================================
 
 import time
-import urllib.parse
 from datetime import datetime
 from functools import wraps
 
@@ -27,6 +33,7 @@ from flask import Flask, render_template, request, jsonify, abort, redirect, sen
 # =============================================================================
 
 from config import get_config
+from utils import encode_player_tag, decode_player_tag, get_error_template_data
 from database import (
     init_db, get_player_games, find_player_matches, get_recent_games,
     get_top_players, get_all_players, validate_api_key, create_api_key_for_client,
@@ -47,16 +54,6 @@ config.validate_config()
 @app.context_processor
 def inject_request():
     return dict(request=request)
-
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-def encode_player_tag(tag):
-    return urllib.parse.quote(tag)
-
-def decode_player_tag(encoded_tag):
-    return urllib.parse.unquote(encoded_tag)
 
 # =============================================================================
 # Decorator Functions
@@ -101,6 +98,7 @@ def rate_limited(max_per_minute):
 # =============================================================================
 
 def calculate_player_stats(games):
+    """Calculate comprehensive player statistics from game data."""
     if not games:
         return {}
     
@@ -213,42 +211,8 @@ def calculate_player_stats(games):
 # Template Data Helper Functions
 # =============================================================================    
 
-def get_app_statistics():
-    try:
-        stats = get_database_stats()
-        return {
-            'total_games': stats.get('total_games', 0),
-            'total_players': stats.get('unique_players', 0),
-            'latest_game_date': stats.get('last_upload'),
-            'stats_generated_at': datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error getting app statistics: {str(e)}")
-        return {'total_games': 0, 'total_players': 0, 'latest_game_date': None, 'stats_generated_at': datetime.now().isoformat(), 'error': str(e)}
-
-def get_error_template_data(status_code, error_description, **kwargs):
-    error_info = {
-        400: {'title': 'Bad Request', 'icon': 'bi-exclamation-triangle', 'type': 'warning'},
-        401: {'title': 'Unauthorized', 'icon': 'bi-shield-x', 'type': 'danger'},
-        403: {'title': 'Forbidden', 'icon': 'bi-shield-exclamation', 'type': 'danger'},
-        404: {'title': 'Page Not Found', 'icon': 'bi-question-circle', 'type': 'info'},
-        429: {'title': 'Too Many Requests', 'icon': 'bi-clock', 'type': 'warning'},
-        500: {'title': 'Server Error', 'icon': 'bi-exclamation-octagon', 'type': 'danger'}
-    }
-    
-    error_meta = error_info.get(status_code, {'title': 'Unknown Error', 'icon': 'bi-exclamation-circle', 'type': 'secondary'})
-    
-    base_data = {
-        'layout_type': 'error', 'has_player_search': False, 'navbar_context': 'error',
-        'status_code': status_code, 'error_description': error_description,
-        'error_title': error_meta['title'], 'error_icon': error_meta['icon'],
-        'error_type': error_meta['type'], 'show_home_link': True,
-        'show_back_link': status_code == 404
-    }
-    base_data.update(kwargs)
-    return base_data
-
 def get_standard_player_template_data(player_code, encoded_player_code):
+    """Generate standardized template data for player pages."""
     games = get_player_games(player_code)
     
     if len(games) == 0:
@@ -271,202 +235,229 @@ def get_standard_player_template_data(player_code, encoded_player_code):
     }
 
 # =============================================================================
-# Web Routes
+# Business Logic Functions (Route Handlers)
 # =============================================================================
 
-@app.route('/')
-def index():
-    app_stats = get_app_statistics()
-    recent_games = get_recent_games(10)
-    top_players = get_top_players(6)
-    return render_template('pages/index.html', app_stats=app_stats,
-                          total_games=app_stats.get('total_games', 0), 
-                          total_players=app_stats.get('total_players', 0),
-                          recent_games=recent_games, top_players=top_players)
-
-@app.route('/player/<encoded_player_code>')
-def player_profile(encoded_player_code):
-    player_code = decode_player_tag(encoded_player_code)
-    template_data = get_standard_player_template_data(player_code, encoded_player_code)
-    if 'redirect_to' in template_data:
-        return redirect(f"/player/{template_data['redirect_encoded']}")
-    return render_template('pages/player_basic.html', **template_data)
-
-@app.route('/player/<encoded_player_code>/detailed')
-def player_detailed(encoded_player_code):
-    player_code = decode_player_tag(encoded_player_code)
-    template_data = get_standard_player_template_data(player_code, encoded_player_code)
-    if 'redirect_to' in template_data:
-        return redirect(f"/player/{template_data['redirect_encoded']}/detailed")
-    return render_template('pages/player_detailed.html', **template_data)
-
-@app.route('/players')
-def players():
-    players_list = get_all_players()
-    return render_template('pages/players.html', players=players_list)
-
-# =============================================================================
-# API Routes
-# =============================================================================
-
-# Add this route to your app.py file in the API Routes section
-
-@app.route('/api/player/<encoded_player_code>/detailed', methods=['POST'])
-def api_player_detailed_post(encoded_player_code):
-    """
-    POST version of the detailed player API for complex filters.
-    Accepts JSON payload instead of query parameters to avoid URL length limits.
-    """
+def get_homepage_data():
+    """Get all data needed for the homepage."""
     try:
-        # Decode the player code
-        player_code = decode_player_tag(encoded_player_code)
-        logger.info(f"API detailed stats POST request for player: '{player_code}'")
-        
-        # Get filter parameters from JSON body
-        filter_data = request.get_json() or {}
-        character_filter = filter_data.get('character', 'all')
-        opponent_filter = filter_data.get('opponent', 'all')
-        opponent_character_filter = filter_data.get('opponent_character', 'all')
-        
-        logger.info(f"POST Filters - Character: {character_filter}, Opponent: {opponent_filter}, Opponent Character: {opponent_character_filter}")
-        
-        # Get all games for this player
-        all_games = get_player_games(player_code)
-        
-        if not all_games:
-            return jsonify({'error': f"Player '{player_code}' not found"}), 404
-        
-        # Collect all available filter options
-        characters_played = set()
-        opponents_faced = set()
-        opponent_characters_faced = set()
-        
-        for game in all_games:
-            characters_played.add(game['player'].get('character_name', 'Unknown'))
-            opponents_faced.add(game['opponent'].get('player_tag', 'Unknown'))
-            opponent_characters_faced.add(game['opponent'].get('character_name', 'Unknown'))
-        
-        # Apply filters
-        filtered_games = all_games
-        
-        # Apply character filter
-        if character_filter != 'all':
-            if isinstance(character_filter, list):
-                character_values = character_filter
-            else:
-                character_values = character_filter.split('|') if '|' in character_filter else [character_filter]
-            filtered_games = [g for g in filtered_games if g['player'].get('character_name') in character_values]
-        
-        # Apply opponent filter
-        if opponent_filter != 'all':
-            if isinstance(opponent_filter, list):
-                opponent_values = opponent_filter
-            else:
-                opponent_values = opponent_filter.split('|') if '|' in opponent_filter else [opponent_filter]
-            filtered_games = [g for g in filtered_games if g['opponent'].get('player_tag') in opponent_values]
-        
-        # Apply opponent character filter
-        if opponent_character_filter != 'all':
-            if isinstance(opponent_character_filter, list):
-                opp_char_values = opponent_character_filter
-            else:
-                opp_char_values = opponent_character_filter.split('|') if '|' in opponent_character_filter else [opponent_character_filter]
-            filtered_games = [g for g in filtered_games if g['opponent'].get('character_name') in opp_char_values]
-        
-        # Calculate overall stats
-        total_filtered = len(filtered_games)
-        wins_filtered = sum(1 for game in filtered_games if game['result'] == 'Win')
-        overall_winrate = wins_filtered / total_filtered if total_filtered > 0 else 0
-        
-        # Calculate character stats
-        character_stats = {}
-        for char in sorted(characters_played):
-            char_games = [g for g in filtered_games if g['player'].get('character_name') == char]
-            char_total = len(char_games)
-            char_wins = sum(1 for g in char_games if g['result'] == 'Win')
-            character_stats[char] = {
-                'games': char_total,
-                'wins': char_wins,
-                'win_rate': char_wins / char_total if char_total > 0 else 0
-            }
-        
-        # Calculate opponent stats
-        opponent_stats = {}
-        for opp in sorted(opponents_faced):
-            opp_games = [g for g in filtered_games if g['opponent'].get('player_tag') == opp]
-            opp_total = len(opp_games)
-            opp_wins = sum(1 for g in opp_games if g['result'] == 'Win')
-            opponent_stats[opp] = {
-                'games': opp_total,
-                'wins': opp_wins,
-                'win_rate': opp_wins / opp_total if opp_total > 0 else 0
-            }
-        
-        # Calculate opponent character stats
-        opponent_char_stats = {}
-        for opp_char in sorted(opponent_characters_faced):
-            opp_char_games = [g for g in filtered_games if g['opponent'].get('character_name') == opp_char]
-            opp_char_total = len(opp_char_games)
-            opp_char_wins = sum(1 for g in opp_char_games if g['result'] == 'Win')
-            opponent_char_stats[opp_char] = {
-                'games': opp_char_total,
-                'wins': opp_char_wins,
-                'win_rate': opp_char_wins / opp_char_total if opp_char_total > 0 else 0
-            }
-        
-        # Calculate date stats
-        date_stats = {}
-        for game in filtered_games:
-            # Extract date from start_time
-            date = game['start_time'].split('T')[0] if 'T' in game['start_time'] else game['start_time']
-            if date not in date_stats:
-                date_stats[date] = {'games': 0, 'wins': 0}
-            
-            date_stats[date]['games'] += 1
-            if game['result'] == 'Win':
-                date_stats[date]['wins'] += 1
-        
-        # Calculate win rates for dates
-        for date in date_stats:
-            date_stats[date]['win_rate'] = date_stats[date]['wins'] / date_stats[date]['games']
-        
-        # Sort date stats by date
-        date_stats_sorted = {k: date_stats[k] for k in sorted(date_stats.keys())}
-        
-        # Return response
-        response = {
-            'player_code': player_code,
-            'total_games': total_filtered,
-            'wins': wins_filtered,
-            'overall_winrate': overall_winrate,
-            'character_stats': character_stats,
-            'opponent_stats': opponent_stats,
-            'opponent_character_stats': opponent_char_stats,
-            'date_stats': date_stats_sorted,
-            'filter_options': {
-                'characters': sorted(list(characters_played)),
-                'opponents': sorted(list(opponents_faced)),
-                'opponent_characters': sorted(list(opponent_characters_faced))
-            },
-            'applied_filters': {
-                'character': character_filter,
-                'opponent': opponent_filter,
-                'opponent_character': opponent_character_filter
-            }
+        # Get database stats directly (removed redundant get_app_statistics function)
+        stats = get_database_stats()
+        app_stats = {
+            'total_games': stats.get('total_games', 0),
+            'total_players': stats.get('unique_players', 0),
+            'latest_game_date': stats.get('last_upload'),
+            'stats_generated_at': datetime.now().isoformat()
         }
         
-        return jsonify(response)
+        recent_games = get_recent_games(10)
+        top_players = get_top_players(6)
         
+        return {
+            'app_stats': app_stats,
+            'total_games': app_stats.get('total_games', 0),
+            'total_players': app_stats.get('total_players', 0),
+            'recent_games': recent_games,
+            'top_players': top_players
+        }
     except Exception as e:
-        logger.error(f"Error in detailed player POST API: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-        
+        logger.error(f"Error getting homepage data: {str(e)}")
+        return {
+            'app_stats': {},
+            'total_games': 0,
+            'total_players': 0,
+            'recent_games': [],
+            'top_players': []
+        }
 
-@app.route('/api/player/<encoded_player_code>/games')
-def api_player_games(encoded_player_code):
+def handle_player_profile_request(encoded_player_code):
+    """Handle logic for player profile requests with redirect handling."""
+    player_code = decode_player_tag(encoded_player_code)
+    template_data = get_standard_player_template_data(player_code, encoded_player_code)
+    
+    if 'redirect_to' in template_data:
+        return {'redirect': True, 'url': f"/player/{template_data['redirect_encoded']}"}
+    
+    return {'redirect': False, 'data': template_data}
+
+def handle_player_detailed_request(encoded_player_code):
+    """Handle logic for detailed player profile requests with redirect handling."""
+    player_code = decode_player_tag(encoded_player_code)
+    template_data = get_standard_player_template_data(player_code, encoded_player_code)
+    
+    if 'redirect_to' in template_data:
+        return {'redirect': True, 'url': f"/player/{template_data['redirect_encoded']}/detailed"}
+    
+    return {'redirect': False, 'data': template_data}
+
+def get_all_players_data():
+    """Get all players data for the players index page."""
     try:
-        player_code = decode_player_tag(encoded_player_code)
-        page = max(1, int(request.args.get('page', '1')))
+        players_list = get_all_players()
+        return {'players': players_list}
+    except Exception as e:
+        logger.error(f"Error getting all players data: {str(e)}")
+        return {'players': []}
+
+def apply_game_filters(games, character_filter='all', opponent_filter='all', opponent_character_filter='all'):
+    """Apply filtering to a list of games based on various criteria."""
+    filtered_games = games
+    
+    # Apply character filter
+    if character_filter != 'all':
+        if isinstance(character_filter, list):
+            character_values = character_filter
+        else:
+            character_values = character_filter.split('|') if '|' in character_filter else [character_filter]
+        filtered_games = [g for g in filtered_games if g['player'].get('character_name') in character_values]
+    
+    # Apply opponent filter
+    if opponent_filter != 'all':
+        if isinstance(opponent_filter, list):
+            opponent_values = opponent_filter
+        else:
+            opponent_values = opponent_filter.split('|') if '|' in opponent_filter else [opponent_filter]
+        filtered_games = [g for g in filtered_games if g['opponent'].get('player_tag') in opponent_values]
+    
+    # Apply opponent character filter
+    if opponent_character_filter != 'all':
+        if isinstance(opponent_character_filter, list):
+            opp_char_values = opponent_character_filter
+        else:
+            opp_char_values = opponent_character_filter.split('|') if '|' in opponent_character_filter else [opponent_character_filter]
+        filtered_games = [g for g in filtered_games if g['opponent'].get('character_name') in opp_char_values]
+    
+    return filtered_games
+
+def extract_filter_options(games):
+    """Extract all available filter options from a set of games."""
+    characters_played = set()
+    opponents_faced = set()
+    opponent_characters_faced = set()
+    
+    for game in games:
+        characters_played.add(game['player'].get('character_name', 'Unknown'))
+        opponents_faced.add(game['opponent'].get('player_tag', 'Unknown'))
+        opponent_characters_faced.add(game['opponent'].get('character_name', 'Unknown'))
+    
+    return {
+        'characters': sorted(list(characters_played)),
+        'opponents': sorted(list(opponents_faced)),
+        'opponent_characters': sorted(list(opponent_characters_faced))
+    }
+
+def calculate_filtered_stats(filtered_games, filter_options):
+    """Calculate comprehensive statistics for filtered game data."""
+    total_filtered = len(filtered_games)
+    wins_filtered = sum(1 for game in filtered_games if game['result'] == 'Win')
+    overall_winrate = wins_filtered / total_filtered if total_filtered > 0 else 0
+    
+    # Character stats
+    character_stats = {}
+    for char in filter_options['characters']:
+        char_games = [g for g in filtered_games if g['player'].get('character_name') == char]
+        char_total = len(char_games)
+        char_wins = sum(1 for g in char_games if g['result'] == 'Win')
+        character_stats[char] = {
+            'games': char_total,
+            'wins': char_wins,
+            'win_rate': char_wins / char_total if char_total > 0 else 0
+        }
+    
+    # Opponent stats
+    opponent_stats = {}
+    for opp in filter_options['opponents']:
+        opp_games = [g for g in filtered_games if g['opponent'].get('player_tag') == opp]
+        opp_total = len(opp_games)
+        opp_wins = sum(1 for g in opp_games if g['result'] == 'Win')
+        opponent_stats[opp] = {
+            'games': opp_total,
+            'wins': opp_wins,
+            'win_rate': opp_wins / opp_total if opp_total > 0 else 0
+        }
+    
+    # Opponent character stats
+    opponent_char_stats = {}
+    for opp_char in filter_options['opponent_characters']:
+        opp_char_games = [g for g in filtered_games if g['opponent'].get('character_name') == opp_char]
+        opp_char_total = len(opp_char_games)
+        opp_char_wins = sum(1 for g in opp_char_games if g['result'] == 'Win')
+        opponent_char_stats[opp_char] = {
+            'games': opp_char_total,
+            'wins': opp_char_wins,
+            'win_rate': opp_char_wins / opp_char_total if opp_char_total > 0 else 0
+        }
+    
+    # Date stats
+    date_stats = {}
+    for game in filtered_games:
+        date = game['start_time'].split('T')[0] if 'T' in game['start_time'] else game['start_time']
+        if date not in date_stats:
+            date_stats[date] = {'games': 0, 'wins': 0}
+        
+        date_stats[date]['games'] += 1
+        if game['result'] == 'Win':
+            date_stats[date]['wins'] += 1
+    
+    # Calculate win rates for dates and sort
+    for date in date_stats:
+        date_stats[date]['win_rate'] = date_stats[date]['wins'] / date_stats[date]['games']
+    
+    date_stats_sorted = {k: date_stats[k] for k in sorted(date_stats.keys())}
+    
+    return {
+        'total_games': total_filtered,
+        'wins': wins_filtered,
+        'overall_winrate': overall_winrate,
+        'character_stats': character_stats,
+        'opponent_stats': opponent_stats,
+        'opponent_character_stats': opponent_char_stats,
+        'date_stats': date_stats_sorted
+    }
+
+def get_detailed_player_data(player_code, filter_data=None):
+    """Get detailed player data with optional filtering."""
+    if filter_data is None:
+        filter_data = {}
+    
+    # Get all games for this player
+    all_games = get_player_games(player_code)
+    if not all_games:
+        return None
+    
+    # Extract filter options from all games
+    filter_options = extract_filter_options(all_games)
+    
+    # Get filter parameters
+    character_filter = filter_data.get('character', 'all')
+    opponent_filter = filter_data.get('opponent', 'all')
+    opponent_character_filter = filter_data.get('opponent_character', 'all')
+    
+    # Apply filters
+    filtered_games = apply_game_filters(
+        all_games, character_filter, opponent_filter, opponent_character_filter
+    )
+    
+    # Calculate statistics
+    stats = calculate_filtered_stats(filtered_games, filter_options)
+    
+    # Build response
+    response = {
+        'player_code': player_code,
+        'filter_options': filter_options,
+        'applied_filters': {
+            'character': character_filter,
+            'opponent': opponent_filter,
+            'opponent_character': opponent_character_filter
+        }
+    }
+    response.update(stats)
+    
+    return response
+
+def get_paginated_player_games(player_code, page=1):
+    """Get paginated games for a player."""
+    try:
         all_games = get_player_games(player_code)
         total_games = len(all_games)
         total_pages = (total_games + config.GAMES_PER_PAGE - 1) // config.GAMES_PER_PAGE
@@ -474,15 +465,129 @@ def api_player_games(encoded_player_code):
         end_idx = min(start_idx + config.GAMES_PER_PAGE, total_games)
         
         if start_idx >= total_games:
-            return jsonify({'total_games': total_games, 'total_pages': total_pages, 'current_page': page, 'games': []})
+            games_page = []
+        else:
+            games_page = all_games[start_idx:end_idx]
         
-        games_page = all_games[start_idx:end_idx]
-        return jsonify({'total_games': total_games, 'total_pages': total_pages, 'current_page': page, 'games': games_page})
+        return {
+            'total_games': total_games,
+            'total_pages': total_pages,
+            'current_page': page,
+            'games': games_page
+        }
+    except Exception as e:
+        logger.error(f"Error getting paginated games for player {player_code}: {str(e)}")
+        raise
+
+def handle_client_registration(client_data, registration_key):
+    """Handle client registration with validation."""
+    if not registration_key or registration_key != config.REGISTRATION_SECRET:
+        abort(401, description="Invalid registration key")
+    
+    try:
+        result = register_or_update_client(client_data)
+        return result
+    except ValueError as e:
+        abort(400, description=str(e))
+    except Exception as e:
+        abort(500, description=f"Server error: {str(e)}")
+
+def handle_games_upload(client_id, upload_data):
+    """Handle games upload with validation."""
+    if upload_data.get('client_id') != client_id:
+        abort(403, description="Client ID in request does not match API key")
+    
+    games = upload_data.get('games', [])
+    try:
+        result = upload_games_for_client(client_id, games)
+        return result
+    except Exception as e:
+        abort(500, description=f"Server error: {str(e)}")
+
+def get_server_statistics():
+    """Get server statistics for API consumption."""
+    try:
+        stats = get_database_stats()
+        return {
+            "total_clients": stats.get('total_clients', 0),
+            "total_games": stats.get('total_games', 0),
+            "unique_players": stats.get('unique_players', 0),
+            "last_upload": stats.get('last_upload')
+        }
+    except Exception as e:
+        abort(500, description=f"Server error: {str(e)}")
+
+# =============================================================================
+# Web Routes (Using Handler Functions)
+# =============================================================================
+
+@app.route('/')
+def index():
+    """Homepage with recent games and top players."""
+    data = get_homepage_data()
+    return render_template('pages/index.html', **data)
+
+@app.route('/player/<encoded_player_code>')
+def player_profile(encoded_player_code):
+    """Basic player profile page."""
+    result = handle_player_profile_request(encoded_player_code)
+    if result['redirect']:
+        return redirect(result['url'])
+    return render_template('pages/player_basic.html', **result['data'])
+
+@app.route('/player/<encoded_player_code>/detailed')
+def player_detailed(encoded_player_code):
+    """Detailed player analysis page."""
+    result = handle_player_detailed_request(encoded_player_code)
+    if result['redirect']:
+        return redirect(result['url'])
+    return render_template('pages/player_detailed.html', **result['data'])
+
+@app.route('/players')
+def players():
+    """All players index page."""
+    data = get_all_players_data()
+    return render_template('pages/players.html', **data)
+
+# =============================================================================
+# API Routes (Using Handler Functions)
+# =============================================================================
+
+@app.route('/api/player/<encoded_player_code>/detailed', methods=['POST'])
+def api_player_detailed_post(encoded_player_code):
+    """POST version of the detailed player API for complex filters."""
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+        logger.info(f"API detailed stats POST request for player: '{player_code}'")
+        
+        filter_data = request.get_json() or {}
+        logger.info(f"POST Filters: {filter_data}")
+        
+        result = get_detailed_player_data(player_code, filter_data)
+        if result is None:
+            return jsonify({'error': f"Player '{player_code}' not found"}), 404
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error in detailed player POST API: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/player/<encoded_player_code>/games')
+def api_player_games(encoded_player_code):
+    """Get paginated games for a player."""
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+        page = max(1, int(request.args.get('page', '1')))
+        
+        result = get_paginated_player_games(player_code, page)
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/player/<encoded_player_code>/stats')
 def api_player_stats(encoded_player_code):
+    """Get basic player statistics."""
     try:
         player_code = decode_player_tag(encoded_player_code)
         games = get_player_games(player_code)
@@ -493,44 +598,26 @@ def api_player_stats(encoded_player_code):
 
 @app.route('/api/clients/register', methods=['POST'])
 def register_client():
+    """Register a new client."""
     client_data = request.json
     registration_key = request.headers.get('X-Registration-Key')
-    if not registration_key or registration_key != config.REGISTRATION_SECRET:
-        abort(401, description="Invalid registration key")
-    try:
-        result = register_or_update_client(client_data)
-        return jsonify(result)
-    except ValueError as e:
-        abort(400, description=str(e))
-    except Exception as e:
-        abort(500, description=f"Server error: {str(e)}")
+    result = handle_client_registration(client_data, registration_key)
+    return jsonify(result)
 
 @app.route('/api/games/upload', methods=['POST'])
 @require_api_key
 @rate_limited(config.RATE_LIMIT_UPLOADS)
 def upload_games(client_id):
+    """Upload games data."""
     upload_data = request.json
-    if upload_data.get('client_id') != client_id:
-        abort(403, description="Client ID in request does not match API key")
-    games = upload_data.get('games', [])
-    try:
-        result = upload_games_for_client(client_id, games)
-        return jsonify(result)
-    except Exception as e:
-        abort(500, description=f"Server error: {str(e)}")
+    result = handle_games_upload(client_id, upload_data)
+    return jsonify(result)
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    try:
-        stats = get_database_stats()
-        return jsonify({
-            "total_clients": stats.get('total_clients', 0),
-            "total_games": stats.get('total_games', 0),
-            "unique_players": stats.get('unique_players', 0),
-            "last_upload": stats.get('last_upload')
-        })
-    except Exception as e:
-        abort(500, description=f"Server error: {str(e)}")
+    """Get server statistics."""
+    stats = get_server_statistics()
+    return jsonify(stats)
 
 # =============================================================================
 # Static File Routes
@@ -538,16 +625,21 @@ def get_stats():
 
 @app.route('/download')
 def download_page():
-    return render_template('pages/download.html', version=config.CLIENT_VERSION,
-                          release_date=config.CLIENT_RELEASE_DATE, download_url="/download/SlippiMonitor.msi")
+    """Client download page."""
+    return render_template('pages/download.html', 
+                          version=config.CLIENT_VERSION,
+                          release_date=config.CLIENT_RELEASE_DATE, 
+                          download_url="/download/SlippiMonitor.msi")
 
 @app.route('/download/<filename>')
 def download_file(filename):
+    """Serve download files."""
     downloads_dir = config.get_downloads_dir()
     return send_from_directory(path=downloads_dir, filename=filename, as_attachment=True)
 
 @app.route('/how-to')
 def how_to_page():
+    """Instructions page."""
     return render_template('pages/how_to.html')
 
 # =============================================================================
