@@ -71,9 +71,13 @@ function getPlayerDataFromTemplate() {
         const data = JSON.parse(dataScript.textContent);
         console.log('Parsed player data successfully:', data);
         
+        // Ensure we have encoded player code
+        const playerCode = data.playerCode || '';
+        const encodedPlayerCode = playerCode ? encodeURIComponent(playerCode) : '';
+        
         return {
-            playerCode: data.playerCode || '',
-            encodedPlayerCode: data.encodedPlayerCode || '',
+            playerCode: playerCode,
+            encodedPlayerCode: encodedPlayerCode,
             stats: data.stats || {},
             recentGames: data.recentGames || []
         };
@@ -159,17 +163,24 @@ function appendGamesToTable(games) {
 
 function createGameRow(game) {
     const row = document.createElement('tr');
+    
+    // Use the data structure from our utils functions
+    const opponentTag = game.opponent?.player_tag || 'Unknown';
+    const opponentEncoded = game.opponent?.encoded_tag || encodeURIComponent(opponentTag);
+    const playerChar = game.player?.character_name || 'Unknown';
+    const opponentChar = game.opponent?.character_name || 'Unknown';
+    
     row.innerHTML = `
         <td class="game-time">${formatGameTime(game.start_time)}</td>
         <td>
-            <a href="/player/${encodeURIComponent(game.opponent.player_tag)}" class="opponent-link">
-                ${game.opponent.player_name}
+            <a href="/player/${opponentEncoded}" class="opponent-link">
+                ${opponentTag}
             </a>
         </td>
         <td>
-            <span data-character-name="${game.player.character_name}" class="character-container me-2"></span>${game.player.character_name}
+            <span data-character-name="${playerChar}" class="character-container me-2"></span>${playerChar}
             vs
-            <span data-character-name="${game.opponent.character_name}" class="character-container me-2"></span>${game.opponent.character_name}
+            <span data-character-name="${opponentChar}" class="character-container me-2"></span>${opponentChar}
         </td>
         <td class="stage-name">Stage ${game.stage_id}</td>
         <td>

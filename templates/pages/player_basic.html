@@ -144,8 +144,8 @@
                     <tr>
                         <td class="game-time">{{ game.start_time }}</td>
                         <td>
-                            <a href="/player/{{ game.opponent.player_tag | urlencode }}" class="opponent-link">
-                                {{ game.opponent.player_name }}
+                            <a href="/player/{{ game.opponent.encoded_tag }}" class="opponent-link">
+                                {{ game.opponent.player_tag }}
                             </a>
                         </td>
                         <td>
