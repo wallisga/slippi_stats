@@ -1,205 +1,256 @@
-# Slippi Stats Web Service
+# Slippi Stats Server
 
-A web-based visualization and analysis service for Super Smash Bros. Melee Slippi replay data. This service reads data collected by the Slippi Stats Collector and presents it in an easy-to-use web interface focused on player statistics.
+A comprehensive web application for collecting, storing, and analyzing Super Smash Bros. Melee game data from Slippi replays. Built with Flask and featuring a modular frontend architecture with real-time filtering and detailed player statistics.
 
 ## Overview
 
-The Slippi Stats Web Service provides a player-centric view of gameplay data, allowing players to:
-
-- View overall performance statistics
-- Analyze character-specific metrics
-- Track matchup data against other players
-- See stage performance
-- Identify strengths and weaknesses
-
-The service is designed to run alongside the Slippi Stats API Server, reading from the same database but presenting the data in a user-friendly format.
+Slippi Stats Server provides:
+- **Player Profile Pages** with comprehensive statistics and performance analysis
+- **Advanced Filtering System** for detailed matchup and character analysis  
+- **Real-time Data Visualization** with interactive charts and tables
+- **RESTful API** for programmatic access to game data
+- **Client Registration System** for automated replay collection
 
 ## Features
 
-- **Player Profiles**: Detailed statistics for each player including win rates, character usage, and rival analysis
-- **Character Analysis**: Character-specific statistics showing matchup performance and stage preferences
-- **Matchup Insights**: Head-to-head statistics between players
-- **Interactive Charts**: Visual representation of player performance over time
-- **Recent Games**: List of recently played games with results
-- **Search Functionality**: Find players by their player code
+### Player Analytics
+- **Basic Profiles**: Win rates, character usage, recent games, highlights
+- **Detailed Analysis**: Advanced filtering by character, opponent, and matchup
+- **Performance Trends**: Time-series charts showing improvement over time
+- **Character Statistics**: Win rates and usage patterns for each character
+- **Rival Detection**: Identifies frequent opponents and challenging matchups
 
-## Requirements
+### Data Management
+- **Automated Collection**: Client applications upload replay data automatically
+- **API Authentication**: Secure API key system for client access
+- **Flexible Storage**: SQLite database with JSON player data for flexibility
+- **Data Validation**: Comprehensive validation and error handling
 
-- Python 3.8+
-- Flask
-- SQLite3 (shared with the Slippi Stats API Server)
-- Web server (Nginx recommended)
-- Access to the Slippi Stats database
+### User Experience
+- **Responsive Design**: Bootstrap-based UI that works on all devices
+- **Character Icons**: Visual character representations throughout the interface
+- **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
+- **Smart Search**: Flexible player search with case-insensitive matching
 
-## Installation
+## Architecture
 
-### Option 1: Using the Setup Script
-
-1. Copy the `web_services_setup.sh` script to your server
-2. Make it executable:
-   ```bash
-   chmod +x web_services_setup.sh
-   ```
-3. Run it as root:
-   ```bash
-   sudo ./web_services_setup.sh
-   ```
-4. The script will:
-   - Create necessary directories
-   - Set up a Python virtual environment
-   - Install dependencies
-   - Configure Nginx
-   - Create a systemd service
-   - Set appropriate permissions
-
-### Option 2: Manual Installation
-
-1. Create application directories:
-   ```bash
-   sudo mkdir -p /opt/slippi-web
-   sudo mkdir -p /opt/slippi-web/static/characters
-   sudo mkdir -p /opt/slippi-web/static/backgrounds
-   sudo mkdir -p /opt/slippi-web/templates
-   ```
-
-2. Set up Python environment:
-   ```bash
-   cd /opt/slippi-web
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install flask gunicorn
-   ```
-
-3. Copy the application files:
-   - Copy `stats_web_service.py` to `/opt/slippi-web/app.py`
-   - Copy template files to `/opt/slippi-web/templates/`
-   - Create placeholder images in `/opt/slippi-web/static/`
-
-4. Create Nginx configuration in `/etc/nginx/sites-available/slippi-web`
-
-5. Create systemd service in `/etc/systemd/system/slippi-web.service`
-
-6. Set permissions:
-   ```bash
-   sudo chown -R slippi:slippi /opt/slippi-web
-   sudo chmod -R 755 /opt/slippi-web
-   ```
-
-7. Enable and start the service:
-   ```bash
-   sudo systemctl enable slippi-web
-   sudo systemctl start slippi-web
-   ```
-
-## Configuration
-
-The web service reads data from the same SQLite database used by the Slippi Stats API Server, located by default at:
+### Frontend Architecture (Modular Design)
 ```
-/opt/slippi-server/app/slippi_data.db
+templates/
+├── base.html                 # Foundation template with core HTML structure
+├── layouts/
+│   ├── simple.html          # Minimal layout for basic pages
+│   ├── player.html          # Enhanced layout for player pages
+│   └── error.html           # Error page layout
+└── pages/
+    ├── index.html           # Homepage
+    ├── player_basic.html    # Basic player profile
+    ├── player_detailed.html # Advanced player statistics
+    └── players.html         # Player index page
+
+static/
+├── css/
+│   ├── base.css            # Core styles and variables
+│   ├── components/         # Reusable component styles
+│   └── pages/             # Page-specific styles
+└── js/
+    ├── base.js            # Global JavaScript utilities
+    ├── components/        # Reusable JavaScript components
+    └── pages/            # Page-specific JavaScript
 ```
 
-If your database is in a different location, you'll need to update the `DATABASE_PATH` variable in the application code.
+**Template Inheritance Pattern:**
+- `base.html` → `layouts/*.html` → `pages/*.html`
+- Each layer adds specific functionality without duplicating code
+- Components are self-contained and reusable across pages
 
-## Usage
-
-Once installed, you can access the web interface by navigating to your server's IP address in a web browser.
-
-### Main Pages
-
-- **Home Page**: Shows overall stats and recent games
-- **Player Profile**: `/player/<player_code>` - Detailed statistics for a specific player
-- **Character Stats**: `/character/<player_code>/<character_name>` - Character-specific stats for a player
-- **Matchup Analysis**: `/matchup/<player_code>/<opponent_code>` - Head-to-head stats between two players
-
-### API Endpoints
-
-The service also provides JSON API endpoints for more advanced integrations:
-
-- `/api/player/<player_code>/games` - Get a player's games with pagination
-- `/api/player/<player_code>/stats` - Get a player's statistics
-
-## Customization
-
-### Character Images
-
-To add character images:
-1. Create PNG images named after each character (lowercase with underscores)
-2. Place them in `/opt/slippi-web/static/characters/`
-3. For example: `/opt/slippi-web/static/characters/fox.png`
-
-### Background Images
-
-For character page background images:
-1. Create JPG images named after each character
-2. Place them in `/opt/slippi-web/static/backgrounds/`
-3. For example: `/opt/slippi-web/static/backgrounds/fox.jpg`
-
-## Maintenance
-
-### Logs
-
-Service logs can be viewed with:
-```bash
-sudo journalctl -u slippi-web -f
+### Backend Architecture (Currently Monolithic, Refactoring in Progress)
 ```
-
-Application logs are written to:
+├── app.py              # Main Flask application (monolithic, being refactored)
+├── config.py           # Centralized configuration management
+├── database.py         # Database operations and connection management
+└── [Future modules]    # Planned modular refactoring
+    ├── services/       # Business logic layer
+    ├── routes/         # Route handlers
+    └── utils/          # Shared utilities
 ```
-/opt/slippi-web/stats_server.log
-```
-
-### Restarting the Service
-
-If you make changes to the application code:
-```bash
-sudo systemctl restart slippi-web
-```
-
-## Troubleshooting
-
-### Service Won't Start
-
-Check the logs for errors:
-```bash
-sudo journalctl -u slippi-web -e
-```
-
-Common issues include:
-- Incorrect database path
-- Permission issues
-- Port conflicts
-
-### Database Connection Issues
-
-Ensure the web service has read access to the database file:
-```bash
-sudo chown slippi:slippi /opt/slippi-server/app/slippi_data.db
-sudo chmod 644 /opt/slippi-server/app/slippi_data.db
-```
-
-### No Data Showing
-
-If the web service runs but doesn't show any data:
-1. Check that the API server is running and collecting data
-2. Verify the database contains entries
-3. Check the path to the database file is correct
-
-## Technical Details
 
 ### Database Schema
+- **clients**: Registered client applications with metadata
+- **games**: Individual game records with JSON player data  
+- **api_keys**: Authentication tokens for API access
 
-The web service expects to find the following tables in the SQLite database:
+## API Documentation
 
-- `clients`: Information about client installations
-- `games`: Game data including player information and results
+### Player Endpoints
+- `GET /api/player/{code}/stats` - Basic player statistics
+- `GET /api/player/{code}/games` - Paginated game history
+- `POST /api/player/{code}/detailed` - Advanced filtering and analysis
 
-### Performance Considerations
+### Data Endpoints  
+- `POST /api/games/upload` - Upload game data (requires API key)
+- `GET /api/stats` - Server statistics and health
+- `POST /api/clients/register` - Client registration
 
-For large databases (10,000+ games), you may want to add indexes to improve query performance:
+### Authentication
+All data modification endpoints require API key authentication via `X-API-Key` header.
 
-```sql
-CREATE INDEX IF NOT EXISTS idx_games_player_tags ON games(json_extract(player_data, '$[*].player_tag'));
-CREATE INDEX IF NOT EXISTS idx_games_start_time ON games(start_time);
+## Installation & Setup
+
+### Prerequisites
+- Python 3.8+
+- SQLite 3 (included with Python)
+- Modern web browser with JavaScript enabled
+- Git (for development)
+
+### Quick Start
+
+#### Windows Development Setup
+For Windows developers, use the included setup script:
+```cmd
+# Clone repository
+git clone <repository-url>
+cd slippi_stats
+
+# Run the Windows setup script
+start_dev_server.bat
 ```
 
-## Future Improvements
+The `start_dev_server.bat` script automatically:
+- Creates a Python virtual environment
+- Installs all dependencies from requirements.txt
+- Sets up Flask development environment variables
+- Initializes the database
+- Starts the development server at http://127.0.0.1:5000
+
+#### Manual Setup (All Platforms)
+```bash
+# Clone repository
+git clone <repository-url>
+cd slippi_stats
+
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize database
+python -c "from database import init_db; init_db()"
+
+# Run development server
+python app.py
+```
+
+### Configuration
+
+#### Development
+For development, the application uses sensible defaults. No additional configuration required.
+
+#### Production
+Set environment variables for production deployment:
+```bash
+export FLASK_ENV=production
+export SECRET_KEY=your-secret-key
+export SLIPPI_REGISTRATION_SECRET=your-registration-secret
+export DATABASE_PATH=/path/to/production.db
+```
+
+### Development Workflow
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines, pull request process, and coding standards.
+
+## Development
+
+### Frontend Development
+The frontend uses a **component-based architecture**:
+
+1. **Base Template** (`base.html`): Core HTML structure, navigation, Bootstrap CSS/JS
+2. **Layout Templates**: Add layout-specific features (player search, specialized navigation)
+3. **Page Templates**: Implement specific page content and functionality
+4. **JavaScript Components**: Reusable functionality (character icons, search, player titles)
+
+### Adding New Pages
+1. Create page template in `templates/pages/`
+2. Choose appropriate layout in `templates/layouts/`  
+3. Add page-specific CSS in `static/css/pages/`
+4. Add page-specific JavaScript in `static/js/pages/`
+5. Create route handler in `app.py`
+
+### Database Operations
+All database operations are centralized in `database.py`:
+- Use `get_db_connection()` for direct database access
+- Existing functions: `get_player_games()`, `get_top_players()`, etc.
+- Follow existing patterns for new database functions
+
+## File Structure Reference
+
+### Templates Directory (`templates/`)
+**Purpose**: Jinja2 templates using inheritance pattern for maintainable HTML
+
+- **`base.html`**: Foundation template with navigation, footer, and core assets
+- **`layouts/`**: Intermediate templates that extend base and add layout-specific features
+  - `simple.html`: Minimal layout for basic pages (homepage, error pages)
+  - `player.html`: Enhanced layout with player search and navigation
+  - `error.html`: Specialized layout for error handling
+- **`pages/`**: Final page templates with specific content
+  - Extend layout templates, not base directly
+  - Contain page-specific content blocks
+  - Include data preparation and presentation logic
+
+### Static Directory (`static/`)
+**Purpose**: Client-side assets organized by type and function
+
+**CSS Structure:**
+- **`base.css`**: Global styles, CSS variables, utility classes
+- **`components/`**: Reusable component styles (cards, tables, player elements)
+- **`pages/`**: Page-specific styles that don't belong in components
+
+**JavaScript Structure:**
+- **`base.js`**: Global utilities and initialization
+- **`components/`**: Reusable functionality modules
+  - `player_title.js`: Dynamic player header component
+  - `character_icons.js`: Character image management
+  - `search.js`: Player search functionality
+- **`pages/`**: Page-specific JavaScript for individual pages
+
+## Contributing
+
+### Code Style
+- **Backend**: Follow PEP 8 for Python code
+- **Frontend**: Use consistent indentation and modern JavaScript practices
+- **Templates**: Maintain Jinja2 template inheritance patterns
+- **CSS**: Follow BEM methodology for component styles
+
+### Testing
+- Database functions should be testable with in-memory SQLite
+- Frontend components should be modular and independently testable
+- API endpoints should have proper error handling and validation
+
+## Roadmap
+
+### Backend Refactoring (In Progress)
+- [ ] Move routes to dedicated modules
+- [ ] Extract business logic to service layer
+- [ ] Create proper error handling middleware
+- [ ] Add comprehensive logging system
+
+### Feature Enhancements
+- [ ] Tournament bracket visualization
+- [ ] Advanced matchup analysis
+- [ ] Player comparison tools
+- [ ] Export functionality for statistics
+
+### Performance Improvements
+- [ ] Database query optimization
+- [ ] Frontend bundle optimization
+- [ ] Caching layer implementation
+- [ ] Progressive loading for large datasets
+
+## License
+
+[Add your license information here]
+
+## Support
+
+[Add support/contact information here]
