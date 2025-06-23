@@ -15,6 +15,61 @@ mkdir -p /opt/slippi-server/backups
 useradd -m -s /bin/bash slippi
 chown -R slippi:slippi /opt/slippi-server
 
+# Add this section to your setup.sh after creating the slippi user
+echo "Setting up Git for deployments..."
+
+# Install git
+apt-get install -y git
+
+# Add Git deployment section to server setup script
+cat >> /tmp/server_setup.sh << 'GITEOF'
+
+# Set up Git for deployments
+echo "Setting up Git deployment..."
+sudo -u slippi git config --global user.name "Slippi Server"
+sudo -u slippi git config --global user.email "slippi@$(hostname)"
+
+# Create deployment script
+cat > /opt/slippi-server/deploy.sh << 'DEPLOYEOF'
+#!/bin/bash
+set -e
+
+echo "🚀 Deploying Slippi Stats Server..."
+
+APP_DIR="/opt/slippi-server/app"
+BACKUP_DIR="/opt/slippi-server/backups"
+SERVICE_NAME="slippi-server"
+
+# Create backup
+echo "📦 Creating backup..."
+timestamp=$(date +"%Y%m%d_%H%M%S")
+if [ -f "$APP_DIR/slippi_data.db" ]; then
+    cp "$APP_DIR/slippi_data.db" "$BACKUP_DIR/slippi_data_$timestamp.db"
+    echo "✅ Database backed up"
+fi
+
+# Update code
+echo "📥 Updating code..."
+cd "$APP_DIR"
+git fetch origin
+git reset --hard origin/main
+
+# Install dependencies
+echo "📚 Installing dependencies..."
+/opt/slippi-server/venv/bin/pip install -r requirements.txt
+
+# Restart service
+echo "🔄 Restarting service..."
+systemctl restart "$SERVICE_NAME"
+
+echo "✅ Deployment completed!"
+DEPLOYEOF
+
+chmod +x /opt/slippi-server/deploy.sh
+chown slippi:slippi /opt/slippi-server/deploy.sh
+
+GITEOF
+
 # Copy server setup script to VM
 cat > /tmp/server_setup.sh << 'EOF'
 #!/bin/bash

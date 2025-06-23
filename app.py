@@ -401,7 +401,84 @@ def calculate_character_stats(games):
         'worst_matchup': worst_matchup,
         'time_stats': time_stats,
         'trend': trend
-    }    
+    }
+
+def get_standard_player_template_data(player_code, encoded_player_code):
+    """
+    Get standardized player data for all player page templates.
+    This ensures consistent data structure across all player pages.
+    
+    Args:
+        player_code (str): The decoded player tag
+        encoded_player_code (str): The URL-encoded player tag
+        
+    Returns:
+        dict: Standardized template data dictionary
+        
+    Raises:
+        404: If player not found
+    """
+    logger.info(f"Getting standard template data for player: '{player_code}'")
+    
+    # Get all games for this player
+    games = get_player_games(player_code)
+    
+    if len(games) == 0:
+        # Try flexible matching
+        potential_matches = find_player_with_flexible_matching(player_code)
+        
+        if potential_matches:
+            # Redirect to case-correct version if found
+            exact_case_insensitive = [m for m in potential_matches if m['match_type'] == 'case_insensitive']
+            if exact_case_insensitive:
+                correct_tag = exact_case_insensitive[0]['tag']
+                logger.info(f"Found case-insensitive match, should redirect to: '{correct_tag}'")
+                # Return redirect info instead of aborting here
+                return {
+                    'redirect_to': correct_tag,
+                    'redirect_encoded': encode_player_tag(correct_tag)
+                }
+        
+        # No games found and no matches
+        abort(404, description=f"Player '{player_code}' not found in database.")
+    
+    # Calculate player statistics
+    stats = calculate_player_stats(games)
+    
+    # FIXED: Ensure games are properly sorted by date (most recent first)
+    # The get_player_games function should already do this, but let's be explicit
+    sorted_games = sorted(games, key=lambda x: x['start_time'], reverse=True)
+    
+    # Get recent games for player title component (last 20, properly sorted)
+    recent_games = sorted_games[:20]
+    
+    # DEBUGGING: Log the most recent game info
+    if recent_games:
+        most_recent = recent_games[0]
+        logger.info(f"Most recent game for {player_code}: {most_recent['start_time']} "
+                   f"({most_recent.get('game_id', 'unknown_id')})")
+    else:
+        logger.warning(f"No recent games found for {player_code}")
+    
+    # Get character list for navigation (if needed)
+    character_list = list(set(g['player']['character_name'] for g in games))
+    
+    # Log what we're providing
+    logger.info(f"Standard template data - Player: {player_code}, "
+                f"Total games: {stats.get('total_games', 0)}, "
+                f"Recent games: {len(recent_games)}, "
+                f"Characters: {len(character_list)}")
+    
+    # Return standardized data structure
+    return {
+        'player_code': player_code,
+        'encoded_player_code': encoded_player_code,
+        'stats': stats,
+        'recent_games': recent_games,
+        'character_list': character_list,
+        'all_games': sorted_games,  # Provide sorted games instead of unsorted
+        'last_game_date': recent_games[0]['start_time'] if recent_games else None  # Explicit last game date
+    }  
 
 # =============================================================================
 # Player Data Functions
@@ -442,24 +519,28 @@ def player_exists(player_code):
 
 def get_player_games(player_code):
     """
-    Get all games for a specific player.
+    Get all games for a specific player, properly sorted by date (most recent first).
     
     Args:
         player_code (str): The player tag to look up
         
     Returns:
-        list: List of game dictionaries for the specified player
+        list: List of game dictionaries for the specified player, sorted by start_time DESC
     """
     logger.info(f"Getting games for player: '{player_code}'")
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Get all games
-    cursor.execute("SELECT game_id, game_type, start_time, last_frame, stage_id, player_data FROM games")
+    # FIXED: Ensure proper ordering in the SQL query
+    cursor.execute("""
+    SELECT game_id, game_type, start_time, last_frame, stage_id, player_data 
+    FROM games 
+    ORDER BY datetime(start_time) DESC
+    """)
     games_raw = cursor.fetchall()
     conn.close()
     
-    logger.info(f"Fetched {len(games_raw)} total games to process")
+    logger.info(f"Fetched {len(games_raw)} total games from database")
     
     # Process the games data
     games = []
@@ -504,7 +585,30 @@ def get_player_games(player_code):
             continue
     
     logger.info(f"Found {len(games)} games for player '{player_code}'")
-    return games
+    
+    # DEBUGGING: Log the first few game dates to verify sorting
+    if games:
+        logger.info(f"Most recent games for {player_code}:")
+        for i, game in enumerate(games[:3]):  # Log first 3 games
+            logger.info(f"  {i+1}. {game['start_time']} (ID: {game['game_id']})")
+    
+    # DOUBLE-CHECK: Sort again on the Python side to be absolutely sure
+    # This handles cases where the database datetime() function might not work as expected
+    try:
+        games_sorted = sorted(games, key=lambda x: x['start_time'], reverse=True)
+        
+        # Verify the sort worked
+        if games and games_sorted[0]['start_time'] != games[0]['start_time']:
+            logger.warning(f"Database sort didn't work properly for {player_code}. "
+                          f"DB first: {games[0]['start_time']}, "
+                          f"Python sort first: {games_sorted[0]['start_time']}")
+        
+        return games_sorted
+        
+    except Exception as e:
+        logger.error(f"Error sorting games for {player_code}: {str(e)}")
+        # Return unsorted if sorting fails
+        return games
 
 def find_player_with_flexible_matching(player_code):
     """
@@ -839,131 +943,38 @@ def index():
 def player_profile(encoded_player_code):
     """
     Player profile page displaying player statistics and recent games.
-    
-    Args:
-        encoded_player_code (str): URL-encoded player tag
-        
-    Returns:
-        str: Rendered HTML template
     """
-
-    # Decode the player code from URL
     player_code = decode_player_tag(encoded_player_code)
-    logger.info(f"Requested player profile: '{player_code}' (encoded as '{encoded_player_code}')")
+    logger.info(f"Requested basic profile for: '{player_code}'")
     
-    # Get all games for this player with proper ordering
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    # Get standardized template data
+    template_data = get_standard_player_template_data(player_code, encoded_player_code)
     
-    # Get all games with descending time order
-    cursor.execute("""
-    SELECT game_id, start_time, last_frame, stage_id, player_data 
-    FROM games 
-    ORDER BY datetime(start_time) DESC
-    """)
-    games_raw = cursor.fetchall()
-    conn.close()
+    # Handle redirect case
+    if 'redirect_to' in template_data:
+        return redirect(f"/player/{template_data['redirect_encoded']}")
     
-    # Process the games data
-    games = []
-    for game in games_raw:
-        try:
-            player_data = json.loads(game['player_data'])
-            
-            # Find the target player's data
-            player_info = None
-            opponent_info = None
-            
-            for player in player_data:
-                if player.get('player_tag') == player_code:
-                    player_info = player
-            
-            # Skip games where the player wasn't found
-            if not player_info:
-                continue
-                
-            # Find the opponent
-            for player in player_data:
-                if player != player_info:
-                    opponent_info = player
-                    break
-            
-            # Skip games without an opponent
-            if not opponent_info:
-                continue
-                
-            games.append({
-                'game_id': game['game_id'],
-                'start_time': game['start_time'],
-                'last_frame': game['last_frame'],
-                'game_duration_seconds': game['last_frame'] / 60,
-                'stage_id': game['stage_id'],
-                'player': player_info,
-                'opponent': opponent_info,
-                'result': player_info.get('result', 'Unknown')
-            })
-        except Exception as e:
-            logger.error(f"Error processing game: {str(e)}")
-            continue
-    
-    logger.info(f"Found {len(games)} games for player '{player_code}'")
-    
-    if len(games) == 0:
-        # Try flexible matching
-        potential_matches = find_player_with_flexible_matching(player_code)
-        
-        if potential_matches:
-            # If we have an exact case-insensitive match, redirect to it
-            exact_case_insensitive = [m for m in potential_matches if m['match_type'] == 'case_insensitive']
-            if exact_case_insensitive:
-                correct_tag = exact_case_insensitive[0]['tag']
-                logger.info(f"Redirecting to case-correct tag: '{correct_tag}'")
-                return redirect(f"/player/{encode_player_tag(correct_tag)}")
-                
-            # If we have exact matches but no games were found, something else is wrong
-            exact_matches = [m for m in potential_matches if m['match_type'] == 'exact']
-            if exact_matches:
-                logger.error(f"Found {len(exact_matches)} exact matches for '{player_code}' but no games were found")
-                
-        abort(404, description=f"Player '{player_code}' was found but no games could be loaded. Please check the debug page for a list of available players.")
-    
-    # Calculate player statistics
-    stats = calculate_player_stats(games)
-    
-    # Get recent games (last 20)
-    recent_games = games[:GAMES_PER_PAGE]
-    
-    # Get character list for dropdown navigation
-    character_list = list(set(g['player']['character_name'] for g in games))
-    
-    # Updated to use the new template path - simple page in pages directory
-    return render_template('pages/player_basic.html', 
-                          player_code=player_code,
-                          encoded_player_code=encoded_player_code,
-                          stats=stats,
-                          recent_games=recent_games,
-                          character_list=character_list)
-                          
+    # Render template with standardized data
+    return render_template('pages/player_basic.html', **template_data)
+
 
 @app.route('/player/<encoded_player_code>/detailed')
 def player_detailed(encoded_player_code):
     """
     Detailed player profile page with filtering capabilities.
-    
-    Args:
-        encoded_player_code (str): URL-encoded player tag
-        
-    Returns:
-        str: Rendered HTML template
     """
-
-    # Decode the player code from URL
     player_code = decode_player_tag(encoded_player_code)
-    logger.info(f"Requested detailed profile for: '{player_code}' (encoded as '{encoded_player_code}')")
+    logger.info(f"Requested detailed profile for: '{player_code}'")
     
-    return render_template('pages/player_detailed.html', 
-                          player_code=player_code,
-                          encoded_player_code=encoded_player_code)
+    # Get standardized template data
+    template_data = get_standard_player_template_data(player_code, encoded_player_code)
+    
+    # Handle redirect case
+    if 'redirect_to' in template_data:
+        return redirect(f"/player/{template_data['redirect_encoded']}/detailed")
+    
+    # Render template with standardized data
+    return render_template('pages/player_detailed.html', **template_data)
 
 
 @app.route('/players')
@@ -1190,7 +1201,6 @@ def api_player_stats(encoded_player_code):
         logger.error(f"Error in API stats route: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# Add this new route to your Flask app
 @app.route('/api/player/<encoded_player_code>/detailed', methods=['POST'])
 def api_player_detailed_post(encoded_player_code):
     """

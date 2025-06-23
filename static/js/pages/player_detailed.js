@@ -4,84 +4,127 @@
 let timeChart = null;
 let characterChart = null;
 let playerData = null;
+let playerTitleComponent = null;
+let originalPlayerStats = null;
 
-// Character icon handling
-function initializeCharacterIcons(container = document) {
-    // Define the character mapping based on the config
-    const characterMapping = {
-        "Mario": "Mario",
-        "Fox": "Fox",
-        "Captain Falcon": "Captain Falcon",
-        "Donkey Kong": "Donkey Kong",
-        "Kirby": "Kirby",
-        "Bowser": "Bowser",
-        "Link": "Link",
-        "Sheik": "Sheik", 
-        "Ness": "Ness",
-        "Peach": "Peach",
-        "Ice Climbers": "Ice Climbers",
-        "Yoshi": "Yoshi",
-        "Pikachu": "Pikachu",
-        "Samus": "Samus",
-        "Jigglypuff": "Jigglypuff",
-        "Mewtwo": "Mewtwo",
-        "Luigi": "Luigi",
-        "Marth": "Marth",
-        "Zelda": "Zelda",
-        "Young Link": "Young Link",
-        "Doctor Mario": "Doctor Mario",
-        "Dr. Mario": "Doctor Mario",
-        "Falco": "Falco",
-        "Pichu": "Pichu",
-        "Game & Watch": "Game & Watch",
-        "Mr. Game & Watch": "Game & Watch",
-        "Ganondorf": "Ganondorf",
-        "Roy": "Roy"
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Player detailed page initializing...');
+    
+    // Get original template data and validate it
+    const originalData = getPlayerDataFromTemplate();
+    console.log('Original template data:', originalData);
+    
+    // Validate that we have basic player data
+    if (!originalData.playerCode) {
+        console.error('No player code found in template data');
+        return;
+    }
+    
+    // Store original stats for title component (ensure they exist)
+    originalPlayerStats = originalData.stats || {
+        total_games: 0,
+        wins: 0,
+        win_rate: 0,
+        most_played_character: null,
+        character_stats: {}
     };
+    
+    console.log('Stored original stats:', originalPlayerStats);
+    
+    // Initialize player title component
+    playerTitleComponent = initializePlayerTitle(originalData);
+    
+    // Setup page functionality
+    setupFilterToggles();
+    initializeEventListeners();
+    
+    // Load detailed data for filtering
+    fetchPlayerData();
+    
+    console.log('Player detailed page loaded');
+});
 
-    // Only select elements that haven't been processed yet
-    container.querySelectorAll('[data-character-name]:not([data-icon-processed])').forEach(function(element) {
-        // Mark as processed to avoid duplicate icons
-        element.setAttribute('data-icon-processed', 'true');
-        
-        const characterName = element.getAttribute('data-character-name');
-        if (characterName && characterMapping[characterName]) {
-            // Create the image element
-            const img = document.createElement('img');
-            img.src = `/static/icons/character/neutral ${characterMapping[characterName]}.png`;
-            img.alt = characterName;
-            img.width = 24;
-            img.height = 24;
-            img.className = 'character-icon';
-            
-            // Add error handling
-            img.onerror = function() {
-                // If image fails to load, replace with character initial
-                this.style.display = 'none';
-                const span = document.createElement('span');
-                span.className = 'character-icon-fallback';
-                span.textContent = characterName.charAt(0);
-                // Add the character as data attribute for styling
-                span.setAttribute('data-character', characterName.toLowerCase().replace(/ /g, '_'));
-                this.parentNode.insertBefore(span, this.nextSibling);
-            };
-            
-            // Add to the DOM
-            element.appendChild(img);
-        } else {
-            // Fallback for unknown characters
-            const span = document.createElement('span');
-            span.className = 'character-icon-fallback';
-            span.textContent = characterName ? characterName.charAt(0) : '?';
-            if (characterName) {
-                span.setAttribute('data-character', characterName.toLowerCase().replace(/ /g, '_'));
-            }
-            element.appendChild(span);
+function initializePlayerTitle(playerData) {
+    const container = document.getElementById('player-title-container');
+    if (!container) {
+        console.error('Player title container not found!');
+        return null;
+    }
+    
+    console.log('Initializing player title with data:', playerData);
+    
+    const playerTitle = new PlayerTitle(
+        playerData.playerCode, 
+        playerData.encodedPlayerCode,
+        {
+            currentPage: 'detailed',
+            stats: playerData.stats,
+            recentGames: playerData.recentGames,
+            showQuickStats: true,
+            showCharacterDropdown: false,
+            showActions: false
         }
-    });
+    );
+    
+    // Initialize character icons after title is created
+    setTimeout(() => {
+        if (typeof initializeCharacterIcons === 'function') {
+            initializeCharacterIcons();
+        }
+    }, 200);
+    
+    return playerTitle;
 }
 
-// Helper function to show loading overlay
+function getPlayerDataFromTemplate() {
+    const dataScript = document.getElementById('player-data');
+    if (!dataScript) {
+        console.error('Player data script not found');
+        return {
+            playerCode: '',
+            encodedPlayerCode: '',
+            stats: {},
+            recentGames: []
+        };
+    }
+    
+    try {
+        const data = JSON.parse(dataScript.textContent);
+        console.log('Raw template data:', data);
+        
+        // Always generate encoded version client-side
+        const playerCode = data.playerCode || '';
+        const encodedPlayerCode = playerCode ? encodeURIComponent(playerCode) : '';
+        
+        // Ensure stats object has required properties with defaults
+        const stats = data.stats || {};
+        const safeStats = {
+            total_games: stats.total_games || 0,
+            wins: stats.wins || 0,
+            win_rate: stats.win_rate || 0,
+            most_played_character: stats.most_played_character || null,
+            character_stats: stats.character_stats || {},
+            ...stats // Preserve any other properties
+        };
+        
+        return {
+            playerCode: playerCode,
+            encodedPlayerCode: encodedPlayerCode,
+            stats: safeStats,
+            recentGames: data.recentGames || []
+        };
+    } catch (error) {
+        console.error('Error parsing player data JSON:', error);
+        return {
+            playerCode: '',
+            encodedPlayerCode: '',
+            stats: {},
+            recentGames: []
+        };
+    }
+}
+
+// Helper functions
 function showLoading() {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) {
@@ -90,7 +133,6 @@ function showLoading() {
     }
 }
 
-// Helper function to hide loading overlay
 function hideLoading() {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) {
@@ -101,7 +143,6 @@ function hideLoading() {
     }
 }
 
-// Get selected values from filter checkboxes
 function getSelectedCheckboxValues(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return [];
@@ -110,39 +151,44 @@ function getSelectedCheckboxValues(containerId) {
     return Array.from(checkboxes).map(cb => cb.value);
 }
 
-// Updated fetchPlayerData function to use POST for complex filters
+// Fetch detailed player data for filtering
 async function fetchPlayerData(filters = {}) {
     showLoading();
     
     try {
-        // Get player code from URL or template variable
-        const playerCode = window.location.pathname.split('/')[2]; // Extract from URL path
+        const playerTemplateData = getPlayerDataFromTemplate();
+        const playerCode = playerTemplateData.playerCode;
         const encodedPlayerCode = encodeURIComponent(playerCode);
         
-        // Save current checkbox selections before making the request
+        if (!playerCode) {
+            throw new Error('No player code available');
+        }
+        
+        console.log('Fetching data for player:', playerCode);
+        
+        // Save current checkbox selections
         const savedSelections = {};
         
-        if (document.getElementById('characterFilterToggle') && document.getElementById('characterFilterToggle').checked) {
+        if (document.getElementById('characterFilterToggle')?.checked) {
             savedSelections.characters = getSelectedCheckboxValues('characterCheckboxes');
         }
         
-        if (document.getElementById('opponentFilterToggle') && document.getElementById('opponentFilterToggle').checked) {
+        if (document.getElementById('opponentFilterToggle')?.checked) {
             savedSelections.opponents = getSelectedCheckboxValues('opponentCheckboxes');
         }
         
-        if (document.getElementById('opponentCharFilterToggle') && document.getElementById('opponentCharFilterToggle').checked) {
+        if (document.getElementById('opponentCharFilterToggle')?.checked) {
             savedSelections.opponentChars = getSelectedCheckboxValues('opponentCharCheckboxes');
         }
         
-        // Prepare filter data for POST request
+        // Prepare filter data
         const filterData = {};
         
-        // Handle checkbox or dropdown filters based on toggle state
-        if (document.getElementById('characterFilterToggle') && document.getElementById('characterFilterToggle').checked) {
-            // Using checkboxes - send as array
+        // Handle filters
+        if (document.getElementById('characterFilterToggle')?.checked) {
             const selectedChars = savedSelections.characters;
-            if (selectedChars && selectedChars.length > 0 && selectedChars.length < playerData?.filter_options.characters.length) {
-                filterData.character = selectedChars; // Send as array instead of pipe-separated string
+            if (selectedChars && selectedChars.length > 0 && selectedChars.length < playerData?.filter_options?.characters?.length) {
+                filterData.character = selectedChars;
             } else {
                 filterData.character = 'all';
             }
@@ -152,11 +198,10 @@ async function fetchPlayerData(filters = {}) {
             filterData.character = 'all';
         }
         
-        if (document.getElementById('opponentFilterToggle') && document.getElementById('opponentFilterToggle').checked) {
-            // Using checkboxes - send as array
+        if (document.getElementById('opponentFilterToggle')?.checked) {
             const selectedOpponents = savedSelections.opponents;
-            if (selectedOpponents && selectedOpponents.length > 0 && selectedOpponents.length < playerData?.filter_options.opponents.length) {
-                filterData.opponent = selectedOpponents; // Send as array
+            if (selectedOpponents && selectedOpponents.length > 0 && selectedOpponents.length < playerData?.filter_options?.opponents?.length) {
+                filterData.opponent = selectedOpponents;
             } else {
                 filterData.opponent = 'all';
             }
@@ -166,11 +211,10 @@ async function fetchPlayerData(filters = {}) {
             filterData.opponent = 'all';
         }
         
-        if (document.getElementById('opponentCharFilterToggle') && document.getElementById('opponentCharFilterToggle').checked) {
-            // Using checkboxes - send as array
+        if (document.getElementById('opponentCharFilterToggle')?.checked) {
             const selectedOpponentChars = savedSelections.opponentChars;
-            if (selectedOpponentChars && selectedOpponentChars.length > 0 && selectedOpponentChars.length < playerData?.filter_options.opponent_characters.length) {
-                filterData.opponent_character = selectedOpponentChars; // Send as array
+            if (selectedOpponentChars && selectedOpponentChars.length > 0 && selectedOpponentChars.length < playerData?.filter_options?.opponent_characters?.length) {
+                filterData.opponent_character = selectedOpponentChars;
             } else {
                 filterData.opponent_character = 'all';
             }
@@ -182,9 +226,8 @@ async function fetchPlayerData(filters = {}) {
         
         const apiUrl = `/api/player/${encodedPlayerCode}/detailed`;
         
-        console.log("POSTing filter data:", filterData);
+        console.log("Sending filter data:", filterData);
         
-        // Use POST instead of GET to avoid URL length limits
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -198,14 +241,13 @@ async function fetchPlayerData(filters = {}) {
         }
         
         const data = await response.json();
-        console.log("Received data:", data);
+        console.log("Received detailed data:", data);
         
         playerData = data;
         
-        // First populate filters with new data
+        // Populate filters and restore selections
         populateFilters(data);
         
-        // Then restore saved selections
         if (savedSelections.characters) {
             restoreCheckboxSelections('characterCheckboxes', savedSelections.characters);
         }
@@ -218,8 +260,14 @@ async function fetchPlayerData(filters = {}) {
             restoreCheckboxSelections('opponentCharCheckboxes', savedSelections.opponentChars);
         }
         
-        // Update UI with new data
+        // Update UI with filtered data
         updateUI(data);
+        
+        // IMPORTANT: Keep player title with original unfiltered stats
+        if (playerTitleComponent && originalPlayerStats) {
+            console.log('Updating title component with original stats:', originalPlayerStats);
+            playerTitleComponent.updateStats(originalPlayerStats);
+        }
         
         hideLoading();
         return data;
@@ -231,45 +279,39 @@ async function fetchPlayerData(filters = {}) {
     }
 }
 
-// Add this helper function to restore checkbox selections
+// Rest of the functions remain the same...
 function restoreCheckboxSelections(containerId, selectedValues) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
     const checkboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all)');
     
-    // First uncheck all checkboxes
     checkboxes.forEach(cb => {
         cb.checked = false;
     });
     
-    // Now check only the ones that were selected before
     checkboxes.forEach(cb => {
         if (selectedValues.includes(cb.value)) {
             cb.checked = true;
         }
     });
     
-    // Update the "Select All" checkbox state
     updateSelectAllCheckbox(containerId, 
         containerId === 'characterCheckboxes' ? 'selectAllCharacters' : 
         containerId === 'opponentCheckboxes' ? 'selectAllOpponents' : 
         'selectAllOpponentChars');
 }
 
-// Create checkbox filters
 function createCheckboxes(containerId, items, namePrefix, selectAllId) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    // Clear existing checkboxes except "Select All"
     const allOption = container.querySelector('.select-all-option');
     if (allOption) {
         container.innerHTML = '';
         container.appendChild(allOption);
     }
     
-    // Add individual checkboxes
     items.forEach((item, index) => {
         const checkDiv = document.createElement('div');
         checkDiv.className = 'checkbox-item';
@@ -284,7 +326,6 @@ function createCheckboxes(containerId, items, namePrefix, selectAllId) {
         input.value = item;
         input.checked = true;
         
-        // Add event listener to update "Select All" checkbox
         input.addEventListener('change', function() {
             updateSelectAllCheckbox(containerId, selectAllId);
         });
@@ -300,7 +341,6 @@ function createCheckboxes(containerId, items, namePrefix, selectAllId) {
         container.appendChild(checkDiv);
     });
     
-    // Set up select all functionality
     const selectAllCheckbox = document.getElementById(selectAllId);
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
@@ -312,7 +352,6 @@ function createCheckboxes(containerId, items, namePrefix, selectAllId) {
     }
 }
 
-// Update the "Select All" checkbox based on individual checkbox states
 function updateSelectAllCheckbox(containerId, selectAllId) {
     const container = document.getElementById(containerId);
     const selectAll = document.getElementById(selectAllId);
@@ -325,7 +364,6 @@ function updateSelectAllCheckbox(containerId, selectAllId) {
     selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
 }
 
-// Populate filter dropdowns
 function populateFilters(data) {
     const characterFilter = document.getElementById('characterFilter');
     const opponentFilter = document.getElementById('opponentFilter');
@@ -374,7 +412,7 @@ function populateFilters(data) {
         opponentCharacterFilter.appendChild(option);
     });
     
-    // Restore previous selections if they exist in the new options
+    // Restore previous selections if they exist
     if (currentCharacter !== 'all') {
         const exists = Array.from(characterFilter.options).some(opt => opt.value === currentCharacter);
         if (exists) characterFilter.value = currentCharacter;
@@ -390,7 +428,7 @@ function populateFilters(data) {
         if (exists) opponentCharacterFilter.value = currentOpponentChar;
     }
     
-    // Apply the filters from the API response
+    // Apply filters from API response
     characterFilter.value = data.applied_filters.character;
     opponentFilter.value = data.applied_filters.opponent;
     opponentCharacterFilter.value = data.applied_filters.opponent_character;
@@ -418,7 +456,6 @@ function populateFilters(data) {
     );
 }
 
-// Update UI with player data
 function updateUI(data) {
     // Update overall stats
     const overallWinRate = data.overall_winrate;
@@ -460,149 +497,82 @@ function updateUI(data) {
     
     if (totalGamesCount) totalGamesCount.textContent = data.total_games;
     
-    // Update character stats table - SORTED BY GAMES PLAYED
-    const characterStatsTable = document.getElementById('character-stats-table');
-    const characterCount = document.getElementById('character-count');
+    // Update stats tables with character icons
+    updateStatsTable('character-stats-table', 'character-count', data.character_stats, true);
+    updateStatsTable('opponent-stats-table', 'opponent-count', data.opponent_stats, false);
+    updateStatsTable('matchup-stats-table', 'matchup-count', data.opponent_character_stats, true);
     
-    if (characterStatsTable) {
-        characterStatsTable.innerHTML = '';
-        
-        let count = 0;
-        
-        // Convert object to array and sort by games played
-        const sortedCharStats = Object.entries(data.character_stats)
-            .filter(([_, stats]) => stats.games > 0)
-            .sort((a, b) => b[1].games - a[1].games);
-        
-        for (const [character, stats] of sortedCharStats) {
-            count++;
-            
-            const row = document.createElement('tr');
-            const winRateClass = stats.win_rate >= 0.6 ? 'text-success' : 
-                                stats.win_rate >= 0.4 ? 'text-warning' :
-                                'text-danger';
-            
-            row.innerHTML = `
-                <td>
-                    <span data-character-name="${character}" class="character-container"></span>
-                    ${character}
-                </td>
-                <td>${stats.games}</td>
-                <td class="${winRateClass} fw-bold">${(stats.win_rate * 100).toFixed(1)}%</td>
-            `;
-            
-            characterStatsTable.appendChild(row);
-        }
-        
-        if (characterCount) characterCount.textContent = count;
-    }
-    
-    // Update opponent stats table - SORTED BY GAMES PLAYED
-    const opponentStatsTable = document.getElementById('opponent-stats-table');
-    const opponentCount = document.getElementById('opponent-count');
-    
-    if (opponentStatsTable) {
-        opponentStatsTable.innerHTML = '';
-        
-        let count = 0;
-        
-        // Convert object to array and sort by games played
-        const sortedOppStats = Object.entries(data.opponent_stats)
-            .filter(([_, stats]) => stats.games > 0)
-            .sort((a, b) => b[1].games - a[1].games);
-        
-        for (const [opponent, stats] of sortedOppStats) {
-            count++;
-            
-            const row = document.createElement('tr');
-            const winRateClass = stats.win_rate >= 0.6 ? 'text-success' : 
-                                stats.win_rate >= 0.4 ? 'text-warning' :
-                                'text-danger';
-            
-            row.innerHTML = `
-                <td>${opponent}</td>
-                <td>${stats.games}</td>
-                <td class="${winRateClass} fw-bold">${(stats.win_rate * 100).toFixed(1)}%</td>
-            `;
-            
-            opponentStatsTable.appendChild(row);
-        }
-        
-        if (opponentCount) opponentCount.textContent = count;
-    }
-    
-    // Update matchup stats table - SORTED BY GAMES PLAYED
-    const matchupStatsTable = document.getElementById('matchup-stats-table');
-    const matchupCount = document.getElementById('matchup-count');
-    
-    if (matchupStatsTable) {
-        matchupStatsTable.innerHTML = '';
-        
-        let count = 0;
-        
-        // Convert object to array and sort by games played
-        const sortedMatchupStats = Object.entries(data.opponent_character_stats)
-            .filter(([_, stats]) => stats.games > 0)
-            .sort((a, b) => b[1].games - a[1].games);
-        
-        for (const [character, stats] of sortedMatchupStats) {
-            count++;
-            
-            const row = document.createElement('tr');
-            const winRateClass = stats.win_rate >= 0.6 ? 'text-success' : 
-                                stats.win_rate >= 0.4 ? 'text-warning' :
-                                'text-danger';
-            
-            row.innerHTML = `
-                <td>
-                    <span data-character-name="${character}" class="character-container"></span>
-                    ${character}
-                </td>
-                <td>${stats.games}</td>
-                <td class="${winRateClass} fw-bold">${(stats.win_rate * 100).toFixed(1)}%</td>
-            `;
-            
-            matchupStatsTable.appendChild(row);
-        }
-        
-        if (matchupCount) matchupCount.textContent = count;
-    }
-    
-    // Update time chart - WITH ERROR HANDLING
+    // Update charts
     if (data.date_stats && Object.keys(data.date_stats).length > 0) {
         try {
             updateTimeChart(data.date_stats);
         } catch (error) {
             console.error("Error updating time chart:", error);
-            // Handle error gracefully - maybe display a message in the chart area
-            const timeChartContainer = document.querySelector('#timeChart').parentNode;
-            if (timeChartContainer) {
-                timeChartContainer.innerHTML = '<div class="alert alert-warning">Unable to load chart. Charts require Chart.js library.</div>';
-            }
+            handleChartError('timeChart');
         }
     }
     
-    // Update character chart - WITH ERROR HANDLING
     if (data.character_stats && Object.keys(data.character_stats).length > 0) {
         try {
             updateCharacterChart(data.character_stats);
         } catch (error) {
             console.error("Error updating character chart:", error);
-            // Handle error gracefully
-            const characterChartContainer = document.querySelector('#characterChart').parentNode;
-            if (characterChartContainer) {
-                characterChartContainer.innerHTML = '<div class="alert alert-warning">Unable to load chart. Charts require Chart.js library.</div>';
-            }
+            handleChartError('characterChart');
         }
     }
     
-    // Initialize character icons
-    initializeCharacterIcons();
+    // Initialize character icons after updating tables
+    if (typeof initializeCharacterIcons === 'function') {
+        initializeCharacterIcons();
+    }
 }
 
-// Update the win rate over time chart with error handling
+function updateStatsTable(tableId, countId, statsData, showCharacterIcons) {
+    const table = document.getElementById(tableId);
+    const countElement = document.getElementById(countId);
+    
+    if (!table) return;
+    
+    table.innerHTML = '';
+    let count = 0;
+    
+    // Convert object to array and sort by games played
+    const sortedStats = Object.entries(statsData)
+        .filter(([_, stats]) => stats.games > 0)
+        .sort((a, b) => b[1].games - a[1].games);
+    
+    for (const [name, stats] of sortedStats) {
+        count++;
+        
+        const row = document.createElement('tr');
+        const winRateClass = stats.win_rate >= 0.6 ? 'text-success' : 
+                            stats.win_rate >= 0.4 ? 'text-warning' :
+                            'text-danger';
+        
+        const nameCell = showCharacterIcons ? 
+            `<td><span data-character-name="${name}" class="character-container"></span>${name}</td>` :
+            `<td>${name}</td>`;
+        
+        row.innerHTML = `
+            ${nameCell}
+            <td>${stats.games}</td>
+            <td class="${winRateClass} fw-bold">${(stats.win_rate * 100).toFixed(1)}%</td>
+        `;
+        
+        table.appendChild(row);
+    }
+    
+    if (countElement) countElement.textContent = count;
+}
+
+function handleChartError(chartId) {
+    const chartContainer = document.querySelector(`#${chartId}`).parentNode;
+    if (chartContainer) {
+        chartContainer.innerHTML = '<div class="alert alert-warning">Unable to load chart. Charts require Chart.js library.</div>';
+    }
+}
+
 function updateTimeChart(dateStats) {
-    // Check if Chart is defined
     if (typeof Chart === 'undefined') {
         console.error("Chart.js is not loaded!");
         return;
@@ -616,17 +586,14 @@ function updateTimeChart(dateStats) {
     
     const ctx = timeChartElement.getContext('2d');
     
-    // Extract dates and win rates
     const dates = Object.keys(dateStats);
     const winRates = dates.map(date => dateStats[date].win_rate * 100);
     const gamesCounts = dates.map(date => dateStats[date].games);
     
-    // If a chart already exists, destroy it
     if (timeChart) {
         timeChart.destroy();
     }
     
-    // Create new chart
     timeChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -700,9 +667,7 @@ function updateTimeChart(dateStats) {
     });
 }
 
-// Update the character performance chart with increased spacing - WITH ERROR HANDLING
 function updateCharacterChart(characterStats) {
-    // Check if Chart is defined
     if (typeof Chart === 'undefined') {
         console.error("Chart.js is not loaded!");
         return;
@@ -716,28 +681,24 @@ function updateCharacterChart(characterStats) {
     
     const ctx = characterChartElement.getContext('2d');
     
-    // Filter to only include characters with games
     const filteredStats = Object.entries(characterStats)
         .filter(([_, stats]) => stats.games > 0)
-        .sort((a, b) => b[1].games - a[1].games); // Sort by games played
+        .sort((a, b) => b[1].games - a[1].games);
     
     const characters = filteredStats.map(([char, _]) => char);
     const winRates = filteredStats.map(([_, stats]) => stats.win_rate * 100);
     const gamesCounts = filteredStats.map(([_, stats]) => stats.games);
     
-    // Generate colors based on win rate
     const backgroundColors = winRates.map(rate => {
-        if (rate >= 60) return 'rgba(40, 167, 69, 0.6)'; // Green
-        if (rate >= 40) return 'rgba(255, 193, 7, 0.6)'; // Yellow
-        return 'rgba(220, 53, 69, 0.6)'; // Red
+        if (rate >= 60) return 'rgba(40, 167, 69, 0.6)';
+        if (rate >= 40) return 'rgba(255, 193, 7, 0.6)';
+        return 'rgba(220, 53, 69, 0.6)';
     });
     
-    // If a chart already exists, destroy it
     if (characterChart) {
         characterChart.destroy();
     }
     
-    // Create new chart
     characterChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -760,10 +721,9 @@ function updateCharacterChart(characterStats) {
                 y: {
                     ticks: {
                         autoSkip: false,
-                        padding: 15 // Increase padding between ticks for better spacing
+                        padding: 15
                     },
                     afterFit: function(scaleInstance) {
-                        // Increase the width of the y-axis to give more room for character names
                         scaleInstance.width = 120;
                     }
                 },
@@ -786,118 +746,109 @@ function updateCharacterChart(characterStats) {
                     }
                 }
             },
-            // Add more spacing between bars
             barPercentage: 0.8,
             categoryPercentage: 0.7
         }
     });
 }
 
-// Toggle between dropdown and checkbox filters
 function setupFilterToggles() {
-    const characterFilterToggle = document.getElementById('characterFilterToggle');
-    const characterFilter = document.getElementById('characterFilter');
-    const characterCheckboxes = document.getElementById('characterCheckboxes');
+    const filterToggles = [
+        {
+            toggle: 'characterFilterToggle',
+            dropdown: 'characterFilter',
+            checkboxes: 'characterCheckboxes'
+        },
+        {
+            toggle: 'opponentFilterToggle',
+            dropdown: 'opponentFilter',
+            checkboxes: 'opponentCheckboxes'
+        },
+        {
+            toggle: 'opponentCharFilterToggle',
+            dropdown: 'opponentCharacterFilter',
+            checkboxes: 'opponentCharCheckboxes'
+        }
+    ];
     
-    const opponentFilterToggle = document.getElementById('opponentFilterToggle');
-    const opponentFilter = document.getElementById('opponentFilter');
-    const opponentCheckboxes = document.getElementById('opponentCheckboxes');
+    filterToggles.forEach(config => {
+        const toggle = document.getElementById(config.toggle);
+        const dropdown = document.getElementById(config.dropdown);
+        const checkboxes = document.getElementById(config.checkboxes);
+        
+        if (toggle && dropdown && checkboxes) {
+            toggle.addEventListener('change', function() {
+                dropdown.style.display = this.checked ? 'none' : 'block';
+                checkboxes.style.display = this.checked ? 'block' : 'none';
+            });
+            
+            // Initialize toggle state - start with checkboxes shown
+            dropdown.style.display = 'none';
+            checkboxes.style.display = 'block';
+        }
+    });
     
-    const opponentCharFilterToggle = document.getElementById('opponentCharFilterToggle');
-    const opponentCharacterFilter = document.getElementById('opponentCharacterFilter');
-    const opponentCharCheckboxes = document.getElementById('opponentCharCheckboxes');
+    // Setup filter collapse toggle icon
+    const filterCollapse = document.getElementById('filterCollapse');
+    const toggleIcon = document.getElementById('filterToggleIcon');
     
-    if (characterFilterToggle && characterFilter && characterCheckboxes) {
-        characterFilterToggle.addEventListener('change', function() {
-            characterFilter.style.display = this.checked ? 'none' : 'block';
-            characterCheckboxes.style.display = this.checked ? 'block' : 'none';
+    if (filterCollapse && toggleIcon) {
+        filterCollapse.addEventListener('hidden.bs.collapse', function() {
+            toggleIcon.classList.add('bi-chevron-down');
+            toggleIcon.classList.remove('bi-chevron-up');
         });
         
-        // Initialize toggle state
-        characterFilter.style.display = 'none';
-        characterCheckboxes.style.display = 'block';
-    }
-    
-    if (opponentFilterToggle && opponentFilter && opponentCheckboxes) {
-        opponentFilterToggle.addEventListener('change', function() {
-            opponentFilter.style.display = this.checked ? 'none' : 'block';
-            opponentCheckboxes.style.display = this.checked ? 'block' : 'none';
+        filterCollapse.addEventListener('shown.bs.collapse', function() {
+            toggleIcon.classList.add('bi-chevron-up');
+            toggleIcon.classList.remove('bi-chevron-down');
         });
-        
-        // Initialize toggle state
-        opponentFilter.style.display = 'none';
-        opponentCheckboxes.style.display = 'block';
-    }
-    
-    if (opponentCharFilterToggle && opponentCharacterFilter && opponentCharCheckboxes) {
-        opponentCharFilterToggle.addEventListener('change', function() {
-            opponentCharacterFilter.style.display = this.checked ? 'none' : 'block';
-            opponentCharCheckboxes.style.display = this.checked ? 'block' : 'none';
-        });
-        
-        // Initialize toggle state
-        opponentCharacterFilter.style.display = 'none';
-        opponentCharCheckboxes.style.display = 'block';
     }
 }
 
-// Event listeners - with error handling
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        // Setup filter toggles
-        setupFilterToggles();
-        
-        // Initial data load
-        fetchPlayerData();
-        
-        // Apply filters button
-        const applyFiltersButton = document.getElementById('applyFilters');
-        if (applyFiltersButton) {
-            applyFiltersButton.addEventListener('click', function() {
-                const characterFilter = document.getElementById('characterFilter');
-                const opponentFilter = document.getElementById('opponentFilter');
-                const opponentCharacterFilter = document.getElementById('opponentCharacterFilter');
-                
-                const filters = {};
-                if (characterFilter) filters.character = characterFilter.value;
-                if (opponentFilter) filters.opponent = opponentFilter.value;
-                if (opponentCharacterFilter) filters.opponent_character = opponentCharacterFilter.value;
-                
-                fetchPlayerData(filters);
-            });
-        }
-        
-        // Reset filters button
-        const resetFiltersButton = document.getElementById('resetFilters');
-        if (resetFiltersButton) {
-            resetFiltersButton.addEventListener('click', function() {
-                // Reset dropdowns
-                const characterFilter = document.getElementById('characterFilter');
-                const opponentFilter = document.getElementById('opponentFilter');
-                const opponentCharacterFilter = document.getElementById('opponentCharacterFilter');
-                
-                if (characterFilter) characterFilter.value = 'all';
-                if (opponentFilter) opponentFilter.value = 'all';
-                if (opponentCharacterFilter) opponentCharacterFilter.value = 'all';
-                
-                // Reset checkboxes - check all options
-                document.querySelectorAll('.filter-checkboxes input[type="checkbox"]').forEach(cb => {
-                    cb.checked = true;
-                });
-                
-                // Reset select all checkboxes
-                const selectAllChars = document.getElementById('selectAllCharacters');
-                const selectAllOpps = document.getElementById('selectAllOpponents');
-                const selectAllOppChars = document.getElementById('selectAllOpponentChars');
-                
-                if (selectAllChars) selectAllChars.checked = true;
-                if (selectAllOpps) selectAllOpps.checked = true;
-                if (selectAllOppChars) selectAllOppChars.checked = true;
-                
-                fetchPlayerData();
-            });
-        }
-    } catch (e) {
-        console.error("Error in DOM ready handler:", e);
+function initializeEventListeners() {
+    // Apply filters button
+    const applyFiltersButton = document.getElementById('applyFilters');
+    if (applyFiltersButton) {
+        applyFiltersButton.addEventListener('click', function() {
+            const characterFilter = document.getElementById('characterFilter');
+            const opponentFilter = document.getElementById('opponentFilter');
+            const opponentCharacterFilter = document.getElementById('opponentCharacterFilter');
+            
+            const filters = {};
+            if (characterFilter) filters.character = characterFilter.value;
+            if (opponentFilter) filters.opponent = opponentFilter.value;
+            if (opponentCharacterFilter) filters.opponent_character = opponentCharacterFilter.value;
+            
+            fetchPlayerData(filters);
+        });
     }
-});
+    
+    // Reset filters button
+    const resetFiltersButton = document.getElementById('resetFilters');
+    if (resetFiltersButton) {
+        resetFiltersButton.addEventListener('click', function() {
+            // Reset dropdowns
+            const characterFilter = document.getElementById('characterFilter');
+            const opponentFilter = document.getElementById('opponentFilter');
+            const opponentCharacterFilter = document.getElementById('opponentCharacterFilter');
+            
+            if (characterFilter) characterFilter.value = 'all';
+            if (opponentFilter) opponentFilter.value = 'all';
+            if (opponentCharacterFilter) opponentCharacterFilter.value = 'all';
+            
+            // Reset checkboxes - check all options
+            document.querySelectorAll('.filter-checkboxes-horizontal input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            
+            // Reset select all checkboxes
+            const selectAllIds = ['selectAllCharacters', 'selectAllOpponents', 'selectAllOpponentChars'];
+            selectAllIds.forEach(id => {
+                const selectAll = document.getElementById(id);
+                if (selectAll) selectAll.checked = true;
+            });
+            
+            fetchPlayerData();
+        });
+    }
+}
