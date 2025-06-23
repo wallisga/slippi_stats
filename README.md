@@ -13,21 +13,24 @@ Slippi Stats Server provides:
 
 ## Architecture & Module Design
 
-### Backend Module Structure
+### Backend Module Structure (Current State)
 ```
 app.py                 # Entry point & Flask application setup
 ├── config.py          # Configuration & environment management
-├── utils.py           # Shared utilities & helper functions
-├── database.py        # Database operations & data access layer
-├── services.py        # Business logic & data processing [PLANNED]
-└── routes/            # HTTP route handlers [PLANNED]
-    ├── web_routes.py  # HTML page routes
-    └── api_routes.py  # JSON API endpoints
+├── utils.py           # Shared utilities & business logic helpers
+├── database.py        # Pure data access layer (no business logic)
+├── web_service.py     # Web-specific business logic & template data
+├── api_service.py     # API-specific business logic & JSON responses
+└── [FUTURE]
+    ├── services.py    # Unified business logic layer [PLANNED]
+    └── routes/        # HTTP route handlers [PLANNED]
+        ├── web_routes.py  # HTML page routes
+        └── api_routes.py  # JSON API endpoints
 ```
 
-### Module Responsibilities & Rules
+### Current Module Responsibilities
 
-#### **config.py** - Configuration Management
+#### **config.py** - Configuration Management ✅ COMPLETE
 **Purpose**: Centralized configuration and environment settings
 
 **Contains:**
@@ -38,153 +41,114 @@ app.py                 # Entry point & Flask application setup
 - Feature flags and limits
 
 **Import Rules**: Cannot import any other app modules
-**Naming**: Configuration classes and getter functions
+**Status**: Stable, well-structured
 
-#### **utils.py** - Shared Utilities  
-**Purpose**: Helper functions used across multiple modules
+#### **utils.py** - Shared Utilities & Business Logic Helpers ✅ COMPLETE
+**Purpose**: Helper functions and shared business logic used across multiple modules
 
 **Contains:**
 - URL encoding/decoding (`encode_player_tag()`, `decode_player_tag()`)
-- Data validation (`validate_filter_data()`, `is_valid_page_number()`)
-- Formatting helpers (`format_win_rate()`, `format_game_duration()`)
-- Safe operations (`safe_divide()`, `safe_int()`)
-- Generic utilities (`ensure_list()`, `truncate_string()`)
+- Error template data (`get_error_template_data()`)
+- **Game Data Processing** (shared between services):
+  - `parse_player_data_from_game()` - Parse JSON player data
+  - `find_player_in_game_data()` - Find specific player in game
+  - `safe_get_player_field()` - Safe field extraction
+  - `process_raw_games_for_player()` - Process games for specific player
+  - `find_flexible_player_matches()` - Player search with fuzzy matching
+  - `extract_player_stats_from_games()` - Extract player rankings
+  - `process_recent_games_data()` - Format recent games for display
 
 **Import Rules**: Can only import `config`
-**Naming Conventions:**
-- `encode_*()` / `decode_*()` - Data conversion
-- `format_*()` - Data formatting  
-- `safe_*()` - Safe operations with fallbacks
-- `is_*()` / `has_*()` - Boolean checks
-- `validate_*()` - Input validation
+**Status**: Complete with comprehensive game processing functions
 
-#### **database.py** - Data Access Layer
+#### **database.py** - Pure Data Access Layer ✅ COMPLETE  
 **Purpose**: Raw database operations ONLY - no business logic
 
 **Contains:**
-- Database connection management (`get_db_connection()`)
-- CRUD operations on specific tables
+- Database connection management (`DatabaseManager` class)
+- Table-specific CRUD operations
 - Raw SQL queries and data retrieval
 - Database initialization (`init_db()`)
 
-**Import Rules**: Can import `config`, `utils`
-**Naming Conventions (Table-Specific):**
-- `get_games_*()` - Retrieve from games table
-- `get_clients_*()` - Retrieve from clients table  
-- `get_api_keys_*()` - Retrieve from api_keys table
-- `find_games_*()` - Search games table
-- `create_game_*()` - Insert into games table
-- `update_clients_*()` - Modify clients table
-- `delete_api_keys_*()` - Remove from api_keys table
+**Key Functions (Table-Organized):**
+- **Games**: `get_games_all()`, `get_games_recent()`, `create_game_record()`
+- **Clients**: `get_clients_all()`, `create_client_record()`, `update_clients_info()`
+- **API Keys**: `get_api_keys_*()`, `create_api_key_record()`, `validate_api_key()`
+- **Statistics**: `get_database_stats()` (simple aggregation only)
 
-**Example Functions:**
-```python
-get_games_for_player(player_code)     # Get games for specific player
-find_games_by_date_range(start, end)  # Search games by date
-create_client_record(client_data)     # Insert new client
-update_clients_last_active(client_id) # Update client activity
-```
+**Import Rules**: Can import `config` only
+**Status**: Complete refactoring - pure data access, no business logic
 
-#### **services.py** - Business Logic Layer [PLANNED]
-**Purpose**: Data processing, calculations, and business rules
+#### **web_service.py** - Web Business Logic ✅ COMPLETE
+**Purpose**: Business logic for web page rendering and template data preparation
 
 **Contains:**
-- Data transformation and enrichment
-- Statistical calculations
-- Business rule validation  
-- Template data preparation
-- Complex operations combining multiple database calls
+- Template data preparation (`prepare_homepage_data()`, `prepare_all_players_data()`)
+- Player statistics calculation (`calculate_player_stats()`)
+- Data access wrappers that combine database + utils processing
+- Request handling logic (`process_player_profile_request()`)
 
 **Import Rules**: Can import `database`, `utils`, `config`
-**Naming Conventions:**
-- `calculate_*()` - Perform calculations
-- `process_*()` - Transform data
-- `prepare_*()` - Ready data for consumption
-- `analyze_*()` - Complex analysis
-- `validate_*()` - Business rule validation
+**Status**: Complete with clean separation from database layer
 
-#### **routes/web_routes.py** - Web Pages [PLANNED]
-**Purpose**: HTML page rendering and static file serving
+#### **api_service.py** - API Business Logic ✅ COMPLETE
+**Purpose**: Business logic for JSON API responses and API-specific concerns
 
 **Contains:**
-- Route handlers that return HTML (`render_template()`)
+- API data processing (`process_detailed_player_data()`, `process_paginated_player_games()`)
+- Advanced filtering logic (`apply_game_filters()`, `calculate_filtered_stats()`)
+- Client management (`register_or_update_client()`, `upload_games_for_client()`)
+- Request validation and error handling
+
+**Import Rules**: Can import `database`, `utils`, `config`
+**Status**: Complete with comprehensive API functionality
+
+#### **app.py** - Flask Application ✅ COMPLETE
+**Purpose**: Flask application setup, route definitions, and HTTP handling
+
+**Contains:**
+- Flask app configuration and initialization
+- Route handlers for both web and API endpoints
+- Authentication decorators (`require_api_key`, `rate_limited`)
+- Error handlers for all HTTP status codes
 - Static file serving
-- Request parameter extraction
-- Redirect logic
-- Error page handling
 
-**Import Rules**: Can import `services`, `utils`, `config`
-**Naming Conventions (Layout-Aware):**
-- `web_simple_*()` - Routes using simple.html layout
-- `web_player_*()` - Routes using player.html layout
-- `web_error_*()` - Routes using error.html layout
+**Import Rules**: Can import all service modules
+**Status**: Clean and well-organized with proper service separation
 
-**Example Routes:**
-```python
-@app.route('/')
-def web_simple_index():               # Uses simple.html layout
-    return render_template('pages/index.html', **data)
-
-@app.route('/player/<code>')  
-def web_player_profile(code):         # Uses player.html layout
-    return render_template('pages/player_basic.html', **data)
-```
-
-#### **routes/api_routes.py** - JSON API [PLANNED]
-**Purpose**: JSON API responses for AJAX and external clients
-
-**Contains:**
-- API route handlers that return JSON (`jsonify()`)
-- Request validation and parameter extraction
-- JSON response formatting
-- API authentication and rate limiting
-- HTTP status code handling
-
-**Import Rules**: Can import `services`, `utils`, `config`
-**Naming Conventions:**
-- `api_*()` - All API endpoints (no layout reference needed)
-
-**Example Routes:**
-```python
-@app.route('/api/player/<code>/stats')
-def api_player_stats(code):           # Returns JSON
-    return jsonify(data)
-
-@app.route('/api/games/upload', methods=['POST'])
-def api_games_upload():               # Returns JSON
-    return jsonify(result)
-```
-
-### Data Flow Architecture
+### Data Flow Architecture (Current)
 
 ```
-HTTP Request → Route Handler → Service Layer → Database Layer → Response
+HTTP Request → app.py Route → Service Layer → Utils + Database → Response
 ```
 
 **Detailed Flow:**
-1. **Route** receives HTTP request and validates parameters
-2. **Route** calls appropriate **Service** function  
+1. **app.py** receives HTTP request and validates parameters
+2. **app.py** calls appropriate **Service** function (web_service or api_service)
 3. **Service** calls **Database** functions for raw data
-4. **Service** processes/transforms data (business logic)
-5. **Service** returns processed data to **Route**
-6. **Route** formats response (HTML template or JSON)
-7. **Route** returns HTTP response
+4. **Service** calls **Utils** functions for data processing
+5. **Service** applies business logic and returns processed data
+6. **app.py** formats response (HTML template or JSON)
+7. **app.py** returns HTTP response
 
-### Module Import Hierarchy
+### Current Module Import Hierarchy
 
 ```
-Routes (web_routes.py, api_routes.py)     # Top level
+app.py (Flask routes & HTTP handling)        # Top level
     ↓ can import
-Services (services.py)                    # Business logic  
-    ↓ can import
-Database (database.py) + Utils (utils.py) + Config (config.py)  # Foundation
+web_service.py + api_service.py              # Business logic layers
+    ↓ can import  
+utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
 ```
 
-**Forbidden Imports:**
-- ❌ Database cannot import Services or Routes
-- ❌ Services cannot import Routes  
-- ❌ Utils cannot import Database, Services, or Routes
-- ❌ Config cannot import anything from the app
+**Import Rules (Enforced):**
+- ✅ Services can import: `database`, `utils`, `config`
+- ✅ Utils can import: `config` only
+- ✅ Database can import: `config` only
+- ✅ App can import: all modules
+- ❌ No circular imports between services
+- ❌ Database cannot import services or utils
+- ❌ Utils cannot import database or services
 
 ## Features
 
@@ -276,10 +240,10 @@ git clone <repository-url>
 cd slippi_stats
 
 # Run the Windows setup script
-start_dev_server.bat
+start_dev.bat
 ```
 
-The `start_dev_server.bat` script automatically:
+The `start_dev.bat` script automatically:
 - Creates a Python virtual environment
 - Installs all dependencies from requirements.txt
 - Sets up Flask development environment variables
@@ -310,10 +274,14 @@ export SLIPPI_REGISTRATION_SECRET=your-registration-secret
 export DATABASE_PATH=/path/to/production.db
 ```
 
-### Development Workflow
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines, pull request process, and coding standards.
-
 ## Development Guidelines
+
+### Current Architecture Benefits
+✅ **Clean Separation**: Database, business logic, and HTTP handling are clearly separated
+✅ **Testability**: Each layer can be tested independently
+✅ **Maintainability**: Changes in one layer don't affect others
+✅ **Reusability**: Shared business logic in utils, service-specific logic in service modules
+✅ **Consistency**: Both web and API use same underlying data processing
 
 ### Adding New Functionality
 
@@ -322,133 +290,109 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines, pull
 # Add to database.py with table-specific naming
 def get_games_by_stage(stage_id):
     """Get all games played on specific stage."""
-    pass
+    with db_manager.get_connection() as conn:
+        # Raw SQL only, no business logic
+        return conn.execute("SELECT * FROM games WHERE stage_id = ?", (stage_id,)).fetchall()
+```
 
-def create_tournament_record(tournament_data):
-    """Insert new tournament record."""  
+#### 2. Shared Business Logic
+```python
+# Add to utils.py for cross-service functionality
+def process_stage_statistics(raw_games):
+    """Process raw games to extract stage statistics."""
+    # Shared data processing logic
     pass
 ```
 
-#### 2. Business Logic
+#### 3. Service-Specific Logic
 ```python
-# Add to services.py with descriptive naming
-def calculate_tournament_standings(tournament_id):
-    """Calculate current tournament standings."""
-    pass
+# Add to web_service.py for web pages
+def prepare_tournament_page_data():
+    """Prepare data for tournament page rendering."""
+    raw_games = get_games_all()
+    return process_tournament_data(raw_games)
 
-def process_matchup_analysis(player1, player2):
-    """Analyze head-to-head matchup data."""
-    pass
+# Add to api_service.py for API endpoints  
+def process_tournament_api_request(tournament_id, filters):
+    """Process tournament API request with filtering."""
+    raw_games = get_games_by_tournament(tournament_id)
+    return apply_tournament_filters(raw_games, filters)
 ```
 
-#### 3. Web Routes
+#### 4. Route Handlers
 ```python
-# Add to routes/web_routes.py with layout prefix
+# Add to app.py with clear separation
 @app.route('/tournaments')
-def web_simple_tournaments():           # Uses simple.html
-    data = services.get_tournaments_data()
+def web_tournaments():
+    data = web_service.prepare_tournament_page_data()
     return render_template('pages/tournaments.html', **data)
 
-@app.route('/tournament/<id>')  
-def web_tournament_bracket(id):         # Uses tournament.html layout
-    data = services.get_tournament_bracket(id)
-    return render_template('pages/tournament_bracket.html', **data)
+@app.route('/api/tournaments/<id>')
+def api_tournament_data(id):
+    result = api_service.process_tournament_api_request(id, request.json)
+    return jsonify(result)
 ```
 
-#### 4. API Routes  
-```python
-# Add to routes/api_routes.py with api_ prefix
-@app.route('/api/tournaments/<id>/standings')
-def api_tournament_standings(id):
-    standings = services.calculate_tournament_standings(id)
-    return jsonify(standings)
-```
+## Completed Refactoring Status
 
-### Error Handling Strategy
+### ✅ Phase 1: Configuration & Database (COMPLETE)
+- [x] Extract configuration to `config.py`
+- [x] Centralize database operations in `database.py`
+- [x] Implement proper logging and error handling
 
-#### Database Layer
-```python
-# Return None/empty or raise on actual errors
-def get_games_for_player(player_code):
-    try:
-        # database operation
-        return games or []  # Return empty list if no games
-    except DatabaseError as e:
-        logger.error(f"Database error: {e}")
-        raise  # Re-raise actual database errors
-```
+### ✅ Phase 2: Services & Utilities (COMPLETE)
+- [x] Extract utilities to `utils.py`
+- [x] Create `web_service.py` for web-specific business logic
+- [x] Create `api_service.py` for API-specific business logic
+- [x] Maintain clean separation between services
 
-#### Services Layer  
-```python
-# Transform data, raise business exceptions
-def get_player_statistics(player_code):
-    games = database.get_games_for_player(player_code)
-    if not games:
-        raise PlayerNotFoundError(f"Player {player_code} not found")
-    return calculate_player_stats(games)
-```
+### ✅ Phase 3: Data Layer Refactoring (COMPLETE)
+- [x] Refactor `database.py` to pure data access layer
+- [x] Move business logic from database to `utils.py`
+- [x] Update services to use new architecture
+- [x] Fix all import dependencies and circular references
 
-#### Routes Layer
-```python
-# Handle business exceptions, return appropriate HTTP responses
-@app.route('/api/player/<code>/stats')
-def api_player_stats(code):
-    try:
-        stats = services.get_player_statistics(code)
-        return jsonify(stats)
-    except PlayerNotFoundError:
-        return jsonify({'error': 'Player not found'}), 404
-    except Exception as e:
-        logger.error(f"API error: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-```
+### Current State: ✅ PRODUCTION READY
+The application now has a clean, maintainable architecture with:
+- **Pure data access layer** (database.py)
+- **Shared business logic** (utils.py)  
+- **Service-specific logic** (web_service.py, api_service.py)
+- **Clean HTTP handling** (app.py)
+- **Comprehensive error handling** and logging
+- **No circular dependencies** or architectural violations
 
-## File Structure Reference
+## Future Enhancements (Optional)
 
-### Templates Directory (`templates/`)
-**Purpose**: Jinja2 templates using inheritance pattern for maintainable HTML
+### Potential Phase 4: Route Extraction (Optional)
+- [ ] Move routes to `routes/web_routes.py` and `routes/api_routes.py`
+- [ ] Create unified `services.py` combining web and API services
+- [ ] Add comprehensive middleware and request processing
 
-- **`base.html`**: Foundation template with navigation, footer, and core assets
-- **`layouts/`**: Intermediate templates that extend base and add layout-specific features
-- **`pages/`**: Final page templates with specific content
+### Feature Enhancements
+- [ ] Advanced matchup analysis
+- [ ] Player comparison tools
+- [ ] Export functionality for statistics
+- [ ] Tournament bracket system
 
-### Static Directory (`static/`)
-**Purpose**: Client-side assets organized by type and function
-
-**CSS/JavaScript Structure**: Modular organization with base → components → pages pattern
+### Performance Improvements
+- [ ] Database query optimization
+- [ ] Frontend bundle optimization
+- [ ] Caching layer implementation
+- [ ] Connection pooling
 
 ## Contributing
 
 ### Code Style
 - **Backend**: Follow PEP 8 for Python code
 - **Module Structure**: Follow the defined import hierarchy and naming conventions
-- **Static Frontend Files**: Use consistent indentation and modern JavaScript practices
-- **Templates**: Maintain Jinja2 template inheritance patterns
+- **No Circular Imports**: Services cannot import from each other
+- **Pure Data Access**: Database layer must remain free of business logic
 
 ### Testing
 - Database functions should be testable with in-memory SQLite
 - Service functions should have comprehensive unit tests
-- Frontend components should be modular and independently testable
+- Utils functions should be independently testable
 - API endpoints should have proper error handling and validation
-
-## Roadmap
-
-### Backend Refactoring (In Progress)
-- [x] Extract utilities to `utils.py` 
-- [ ] Create `services.py` business logic layer
-- [ ] Move routes to `routes/web_routes.py` and `routes/api_routes.py`
-- [ ] Add comprehensive logging and error handling
-- [ ] Optimize database queries and add connection pooling
-
-### Feature Enhancements
-- [ ] Advanced matchup analysis
-- [ ] Player comparison tools
-- [ ] Export functionality for statistics
-
-### Performance Improvements
-- [ ] Database query optimization
-- [ ] Frontend bundle optimization
-- [ ] Caching layer implementation
 
 ## License
 
