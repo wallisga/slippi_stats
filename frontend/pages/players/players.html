@@ -1,0 +1,88 @@
+{% extends "layouts/simple.html" %}
+
+{# NO component imports - layout provides all components #}
+
+{% block title %}All Players - Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pages/players/players.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-header">All Players</h1>
+        <p class="lead text-muted">Browse and search player statistics</p>
+    </div>
+</div>
+
+<!-- Search and Filter - Use component macro from layout -->
+{{ filter_search("playersTable", "Search by player tag, name, or character...", true) }}
+
+<!-- Players Table -->
+{% if players %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="playersTable">
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Games</th>
+                        <th>Win Rate</th>
+                        <th>Most Played</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in players %}
+                    <tr class="player-row">
+                        <td>
+                            <div class="player-info">
+                                <div class="player-tag">{{ player.code }}</div>
+                                <div class="player-name">{{ player.name }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary game-count">{{ player.games }}</span>
+                        </td>
+                        <td>
+                            <span class="win-rate {% if player.win_rate >= 0.6 %}text-success{% elif player.win_rate >= 0.4 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ (player.win_rate * 100) | round(1) }}%
+                            </span>
+                        </td>
+                        <td class="player-characters">
+                            {% if player.most_played_character %}
+                            <span data-character-name="{{ player.most_played_character }}" class="character-container me-1"></span>
+                            {{ player.most_played_character }}
+                            {% else %}
+                            <span class="text-muted">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/player/{{ player.code_encoded }}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-person-circle me-1"></i>View Profile
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- Empty State -->
+<div class="empty-state text-center py-5">
+    <i class="bi bi-people display-1 text-muted mb-3"></i>
+    <h3>No Players Found</h3>
+    <p class="text-muted">No player data is available yet.</p>
+    <a href="/download" class="btn btn-primary">Download Client</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='pages/players/players.js') }}"></script>
+{% endblock %}

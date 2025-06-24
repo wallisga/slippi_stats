@@ -47,7 +47,9 @@ import api_service
 # =============================================================================
 
 config = get_config()
-app = Flask(__name__)
+app = Flask(__name__, 
+            template_folder='frontend',    # Templates now in frontend/
+            static_folder='frontend')      # Static assets now in frontend/
 app.config.update({'SECRET_KEY': config.SECRET_KEY, 'DEBUG': config.DEBUG})
 logger = config.init_logging()
 config.validate_config()
@@ -102,7 +104,7 @@ def rate_limited(max_per_minute):
 def web_simple_index():
     """Homepage with recent games and top players."""
     data = web_service.prepare_homepage_data()
-    return render_template('pages/index.html', **data)
+    return render_template('pages/index/index.html', **data)
 
 @app.route('/player/<encoded_player_code>')
 def web_player_profile(encoded_player_code):
@@ -110,7 +112,7 @@ def web_player_profile(encoded_player_code):
     result = web_service.process_player_profile_request(encoded_player_code)
     if result['redirect']:
         return redirect(result['url'])
-    return render_template('pages/player_basic.html', **result['data'])
+    return render_template('pages/player_basic/player_basic.html', **result['data'])
 
 @app.route('/player/<encoded_player_code>/detailed')
 def web_player_detailed(encoded_player_code):
@@ -118,13 +120,13 @@ def web_player_detailed(encoded_player_code):
     result = web_service.process_player_detailed_request(encoded_player_code)
     if result['redirect']:
         return redirect(result['url'])
-    return render_template('pages/player_detailed.html', **result['data'])
+    return render_template('pages/player_detailed/player_detailed.html', **result['data'])
 
 @app.route('/players')
 def web_simple_players():
     """All players index page."""
     data = web_service.prepare_all_players_data()
-    return render_template('pages/players.html', **data)
+    return render_template('pages/players/players.html', **data)
 
 # =============================================================================
 # API Routes (Using API Service)
@@ -207,7 +209,7 @@ def api_server_stats():
 @app.route('/download')
 def web_simple_download():
     """Client download page."""
-    return render_template('pages/download.html', 
+    return render_template('pages/download/download.html', 
                           version=config.CLIENT_VERSION,
                           release_date=config.CLIENT_RELEASE_DATE, 
                           download_url="/download/SlippiMonitor.msi")
@@ -221,7 +223,7 @@ def web_download_file(filename):
 @app.route('/how-to')
 def how_to_page():
     """Instructions page."""
-    return render_template('pages/how_to.html')
+    return render_template('pages/how_to/how_to.html')
 
 # =============================================================================
 # Error Handlers
@@ -230,39 +232,39 @@ def how_to_page():
 @app.errorhandler(400)
 def bad_request(error):
     template_data = get_error_template_data(400, str(error.description))
-    return render_template('pages/error_status.html', **template_data), 400
+    return render_template('pages/error_status/error_status.html', **template_data), 400
 
 @app.errorhandler(401)
 def unauthorized(error):
     template_data = get_error_template_data(401, str(error.description))
-    return render_template('pages/error_status.html', **template_data), 401
+    return render_template('pages/error_status/error_status.html', **template_data), 401
 
 @app.errorhandler(403)
 def forbidden(error):
     template_data = get_error_template_data(403, str(error.description))
-    return render_template('pages/error_status.html', **template_data), 403
+    return render_template('pages/error_status/error_status.html', **template_data), 403
 
 @app.errorhandler(404)
 def page_not_found(error):
     template_data = get_error_template_data(404, str(error.description))
-    return render_template('pages/error_status.html', **template_data), 404
+    return render_template('pages/error_status/error_status.html', **template_data), 404
 
 @app.errorhandler(429)
 def too_many_requests(error):
     template_data = get_error_template_data(429, str(error.description))
-    return render_template('pages/error_status.html', **template_data), 429
+    return render_template('pages/error_status/error_status.html', **template_data), 429
 
 @app.errorhandler(500)
 def server_error(error):
     template_data = get_error_template_data(500, str(error))
-    return render_template('pages/error_status.html', **template_data), 500
+    return render_template('pages/error_status/error_status.html', **template_data), 500
 
 @app.errorhandler(Exception)
 def handle_exception(error):
     logger.error(f"Unhandled exception: {str(error)}")
     # Use get_error_template_data for consistency
     template_data = get_error_template_data(500, f"An unexpected error occurred: {str(error)}")
-    return render_template('pages/error_status.html', **template_data), 500
+    return render_template('pages/error_exception/error_exception.html', **template_data), 500
 
 # =============================================================================
 # Application Initialization

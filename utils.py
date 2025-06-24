@@ -266,7 +266,8 @@ def extract_player_stats_from_games(raw_games):
     """
     player_stats = {}
     
-    for game in raw_games[:5]:  # Only debug first 5 games to avoid spam
+    # Keep the existing game processing logic exactly as it was
+    for game in raw_games[:5]:  # Debug first 5 games
         try:
             # Convert sqlite3.Row to dict for easier access
             game_dict = dict(game) if hasattr(game, 'keys') else game
@@ -282,9 +283,15 @@ def extract_player_stats_from_games(raw_games):
                     continue
                     
                 if tag not in player_stats:
-                    player_stats[tag] = {'games': 0, 'wins': 0}
+                    player_stats[tag] = {'games': 0, 'wins': 0, 'characters': {}}
                 
                 player_stats[tag]['games'] += 1
+                
+                # Track character usage - ADD THIS PART
+                character = player.get('character_name', 'Unknown')
+                if character not in player_stats[tag]['characters']:
+                    player_stats[tag]['characters'][character] = 0
+                player_stats[tag]['characters'][character] += 1
                 
                 # Check result field instead of placement
                 result = player.get('result', '')
@@ -313,9 +320,16 @@ def extract_player_stats_from_games(raw_games):
                     continue
                     
                 if tag not in player_stats:
-                    player_stats[tag] = {'games': 0, 'wins': 0}
+                    player_stats[tag] = {'games': 0, 'wins': 0, 'characters': {}}
                 
                 player_stats[tag]['games'] += 1
+                
+                # Track character usage
+                character = player.get('character_name', 'Unknown')
+                if character not in player_stats[tag]['characters']:
+                    player_stats[tag]['characters'][character] = 0
+                player_stats[tag]['characters'][character] += 1
+                
                 if player.get('result') == 'Win':
                     player_stats[tag]['wins'] += 1
                     
@@ -328,6 +342,11 @@ def extract_player_stats_from_games(raw_games):
     for tag, stats in player_stats.items():
         win_rate = calculate_win_rate(stats['wins'], stats['games'])
         
+        # NEW: Calculate most played character
+        most_played_character = None
+        if stats['characters']:
+            most_played_character = max(stats['characters'].items(), key=lambda x: x[1])[0]
+        
         all_players.append({
             # Frontend expects these field names
             'name': tag,  # Frontend expects 'name' field
@@ -336,6 +355,7 @@ def extract_player_stats_from_games(raw_games):
             'games': stats['games'],
             'wins': stats['wins'],
             'win_rate': win_rate,
+            'most_played_character': most_played_character,  # NEW FIELD
             
             # Legacy format for backward compatibility
             'tag': tag,

@@ -1,0 +1,74 @@
+/* Advanced Filters Component CSS */
+/* frontend/components/filters/filters.css */
+
+.filter-card {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.filter-card .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.filter-card .card-header h5 {
+    color: #495057;
+}
+
+.filter-checkboxes-horizontal {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    background-color: #fafafa;
+}
+
+.filter-checkboxes-horizontal .checkbox-item {
+    margin-bottom: 4px;
+}
+
+.filter-checkboxes-horizontal .form-check {
+    margin-bottom: 0;
+}
+
+.filter-checkboxes-horizontal .form-check-label {
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.filter-checkboxes-horizontal .select-all-option {
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+.filter-checkboxes-horizontal .select-all-option .form-check-label {
+    font-weight: 600;
+    color: #212529;
+}
+
+#filterToggleIcon {
+    transition: transform 0.2s ease;
+}
+
+.form-switch .form-check-input {
+    width: 2em;
+    margin-left: -2.5em;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .filter-checkboxes-horizontal {
+        max-height: 120px;
+    }
+    
+    .filter-card .card-body {
+        padding: 1rem 0.75rem;
+    }
+    
+    .filter-card .row > .col-md-4 {
+        margin-bottom: 1rem;
+    }
+}

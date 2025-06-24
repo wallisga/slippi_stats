@@ -1,0 +1,48 @@
+/* Charts Component CSS */
+.chart-container {
+    position: relative;
+    min-height: 300px;
+}
+
+.chart-container .alert {
+    margin: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #6c757d;
+}
+
+.chart-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #dc3545;
+}
+
+.chart-error i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .chart-container {
+        min-height: 250px;
+    }
+}
+
+@media (max-width: 576px) {
+    .chart-container {
+        min-height: 200px;
+    }
+}

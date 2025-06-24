@@ -1,0 +1,251 @@
+<!-- frontend/components/cards/_cards.html -->
+{# Component manages its own assets #}
+<link rel="stylesheet" href="{{ url_for('static', filename='components/cards/cards.css') }}">
+<script src="{{ url_for('static', filename='components/cards/cards.js') }}"></script>
+
+{# ============================================================================= #}
+{# STAT CARD MACRO - Uses caller for content #}
+{# ============================================================================= #}
+{% macro stat_card(title, icon="bi-graph-up", card_class="stat-card") %}
+<div class="card {{ card_class }} mb-4">
+    <div class="card-header">
+        <h5><i class="{{ icon }} me-2"></i>{{ title }}</h5>
+    </div>
+    <div class="card-body">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# PERFORMANCE OVERVIEW CARD MACRO #}
+{# ============================================================================= #}
+{% macro performance_overview_card(stats) %}
+{% if stats %}
+{% call stat_card("Performance Overview", "bi-graph-up") %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="stat-item mb-3">
+            <h6 class="text-muted">Total Games Played</h6>
+            <h3 class="text-primary">{{ stats.total_games }}</h3>
+        </div>
+        <div class="stat-item mb-3">
+            <h6 class="text-muted">Overall Win Rate</h6>
+            <h3 class="text-{{ 'success' if stats.win_rate >= 0.6 else 'warning' if stats.win_rate >= 0.4 else 'danger' }}">
+                {{ (stats.win_rate * 100) | round(1) }}%
+            </h3>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="stat-item mb-3">
+            <h6 class="text-muted">Wins / Losses</h6>
+            <h3>{{ stats.wins }} / {{ stats.total_games - stats.wins }}</h3>
+        </div>
+        <div class="stat-item mb-3">
+            <h6 class="text-muted">Most Played Character</h6>
+            <h4>
+                {% if stats.most_played_character %}
+                <span data-character-name="{{ stats.most_played_character }}" class="character-container me-2"></span>
+                {{ stats.most_played_character }}
+                {% else %}
+                N/A
+                {% endif %}
+            </h4>
+        </div>
+    </div>
+</div>
+{% endcall %}
+{% else %}
+{% call stat_card("Performance Overview", "bi-graph-up") %}
+<p class="text-muted">No statistics available</p>
+{% endcall %}
+{% endif %}
+{% endmacro %}
+
+{# ============================================================================= #}
+{# HIGHLIGHTS CARD MACRO #}
+{# ============================================================================= #}
+{% macro highlights_card(stats) %}
+{% if stats %}
+{% call stat_card("Highlights", "bi-trophy") %}
+<div class="highlight-item mb-3">
+    <h6 class="text-muted mb-1">Best Character</h6>
+    {% if stats.best_character %}
+    <div class="d-flex align-items-center">
+        <span data-character-name="{{ stats.best_character }}" class="character-container me-2"></span>
+        <span class="fw-bold">{{ stats.best_character }}</span>
+    </div>
+    {% else %}
+    <span class="text-muted">Not enough data</span>
+    {% endif %}
+</div>
+
+<div class="highlight-item mb-3">
+    <h6 class="text-muted mb-1">Rising Star</h6>
+    {% if stats.rising_star %}
+    <div class="d-flex align-items-center">
+        <span data-character-name="{{ stats.rising_star }}" class="character-container me-2"></span>
+        <span class="fw-bold text-success">{{ stats.rising_star }}</span>
+        <i class="bi bi-trending-up ms-2 text-success"></i>
+    </div>
+    {% else %}
+    <span class="text-muted">Not enough recent data</span>
+    {% endif %}
+</div>
+
+<div class="highlight-item mb-3">
+    <h6 class="text-muted mb-1">Rival</h6>
+    {% if stats.rival %}
+    <div>
+        <span class="fw-bold text-danger">{{ stats.rival.opponent_tag }}</span>
+        <small class="text-muted d-block">{{ (stats.rival.win_rate * 100) | round(1) }}% win rate</small>
+    </div>
+    {% else %}
+    <span class="text-muted">No rivals identified</span>
+    {% endif %}
+</div>
+
+<div class="highlight-item">
+    <h6 class="text-muted mb-1">Best Stage</h6>
+    {% if stats.best_stage %}
+    <div>
+        <span class="fw-bold text-info">Stage {{ stats.best_stage.id }}</span>
+        <small class="text-muted d-block">{{ (stats.best_stage.win_rate * 100) | round(1) }}% win rate</small>
+    </div>
+    {% else %}
+    <span class="text-muted">Not enough stage data</span>
+    {% endif %}
+</div>
+{% endcall %}
+{% else %}
+{% call stat_card("Highlights", "bi-trophy") %}
+<p class="text-muted">No highlights available</p>
+{% endcall %}
+{% endif %}
+{% endmacro %}
+
+{# ============================================================================= #}
+{# ADVANCED FILTERS CARD MACRO #}
+{# ============================================================================= #}
+{% macro advanced_filters_card() %}
+<div class="card mb-4 filter-card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-funnel-fill me-2"></i>Advanced Filters
+            </h5>
+            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="true">
+                <i class="bi bi-chevron-up" id="filterToggleIcon"></i>
+            </button>
+        </div>
+    </div>
+    <div class="collapse show" id="filterCollapse">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    {{ filter_column("Your Character", "character", "All Characters") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ filter_column("Opponent", "opponent", "All Opponents") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ filter_column("Opponent's Character", "opponentChar", "All Characters") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button id="resetFilters" class="btn btn-outline-secondary btn-sm">Reset Filters</button>
+                        <button id="applyFilters" class="btn btn-primary btn-sm">Apply Filters</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# FILTER COLUMN MACRO #}
+{# ============================================================================= #}
+{% macro filter_column(label, filter_type, placeholder) %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <label class="form-label mb-0 fw-semibold">{{ label }}</label>
+    <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="{{ filter_type }}FilterToggle" checked>
+        <label class="form-check-label small" for="{{ filter_type }}FilterToggle">Multi-select</label>
+    </div>
+</div>
+<select class="form-select form-select-sm" id="{{ filter_type }}Filter" style="display: none;">
+    <option value="all" selected>{{ placeholder }}</option>
+</select>
+<div class="filter-checkboxes-horizontal" id="{{ filter_type }}Checkboxes">
+    <div class="checkbox-item select-all-option">
+        <div class="form-check">
+            <input class="form-check-input select-all" type="checkbox" id="selectAll{{ filter_type.title() }}s" checked>
+            <label class="form-check-label small" for="selectAll{{ filter_type.title() }}s">{{ placeholder }}</label>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# WIN RATE CIRCLE CARD MACRO #}
+{# ============================================================================= #}
+{% macro win_rate_circle_card(title, prefix="") %}
+<div class="card stat-card h-100">
+    <div class="card-body text-center">
+        <h5 class="card-title">{{ title }}</h5>
+        <div class="win-rate-circle my-3" id="{{ prefix }}-win-rate-circle" style="--win-rate: 0">
+            <div class="win-rate-inner" id="{{ prefix }}-win-rate">0%</div>
+        </div>
+        <p class="card-text" id="{{ prefix }}-stats">
+            <strong>0</strong> wins out of <strong>0</strong> games
+        </p>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# FILTER SUMMARY CARD MACRO #}
+{# ============================================================================= #}
+{% macro filter_summary_card() %}
+<div class="card stat-card h-100">
+    <div class="card-header">
+        <h5>Current Filter Results</h5>
+    </div>
+    <div class="card-body">
+        <p id="charactersPlayingAs" class="mb-2">Playing as: <strong>All characters</strong></p>
+        <p id="opponentsPlayingAgainst" class="mb-2">Playing against: <strong>All opponents</strong></p>
+        <p id="charactersPlayingAgainst" class="mb-2">Opposing characters: <strong>All characters</strong></p>
+        <p class="text-muted small">Showing data from <span id="totalGamesCount">0</span> matches</p>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# CHART CARD MACRO #}
+{# ============================================================================= #}
+{% macro chart_card(title, chart_id) %}
+<div class="card stat-card">
+    <div class="card-header">
+        <h5>{{ title }}</h5>
+    </div>
+    <div class="card-body">
+        <div class="chart-container" style="position: relative; height:300px;">
+            <canvas id="{{ chart_id }}"></canvas>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# LOADING OVERLAY MACRO #}
+{# ============================================================================= #}
+{% macro loading_overlay() %}
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner-border loading-spinner" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endmacro %}

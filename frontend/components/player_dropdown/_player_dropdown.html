@@ -1,0 +1,23 @@
+<!-- frontend/components/player_dropdown/_player_dropdown.html -->
+{# Component manages its own assets #}
+<script src="{{ url_for('static', filename='components/player_dropdown/player_dropdown.js') }}"></script>
+
+{# ============================================================================= #}
+{# PLAYER DROPDOWN MACRO #}
+{# ============================================================================= #}
+{% macro player_dropdown(player_code=None) %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle active" href="#" id="playerDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Players
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="playerDropdown">
+        <li><a class="dropdown-item" href="/players">Player Index</a></li>
+        {% if player_code %}
+        <li><hr class="dropdown-divider"></li>
+        <li><h6 class="dropdown-header">{{ player_code }}</h6></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="basic" href="#">Basic Profile</a></li>
+        <li><a class="dropdown-item player-link" data-path="/player/" data-code="{{ player_code }}" data-view="detailed" data-suffix="/detailed" href="#">Detailed Stats</a></li>
+        {% endif %}
+    </ul>
+</li>
+{% endmacro %}

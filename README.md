@@ -150,6 +150,128 @@ utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
 - ❌ Database cannot import services or utils
 - ❌ Utils cannot import database or services
 
+## Frontend Architecture (Component-Based Design)
+
+### Component Architecture Philosophy
+
+The frontend follows a **component-based architecture** where:
+
+1. **Components are self-contained packages** - Each component includes its own template, CSS, and JavaScript
+2. **Layouts orchestrate components** - Layouts import and compose components as needed
+3. **Base template is minimal** - Only includes Bootstrap, base.css, and base.js
+4. **Pages focus on content** - Page-specific functionality only, no component imports
+
+### Directory Structure
+
+```
+templates/
+├── base.html                    # Foundation: Bootstrap + base assets only
+├── components/                  # Self-contained component packages
+│   ├── search/
+│   │   ├── _search.html        # Template
+│   │   ├── search.css          # Styles (loaded by template)
+│   │   └── search.js           # Behavior (loaded by template)
+│   ├── character_icons/
+│   │   ├── _character_icons.html
+│   │   ├── character_icons.css
+│   │   └── character_icons.js
+│   ├── player_title/
+│   │   ├── _player_title.html
+│   │   ├── player_title.css
+│   │   └── player_title.js
+│   └── game_table/
+│       ├── _game_table.html
+│       ├── game_table.css
+│       └── game_table.js
+├── layouts/                     # Component orchestration layer
+│   ├── simple.html             # Imports: search, character_icons
+│   ├── player.html             # Imports: search, character_icons, player_title
+│   └── error.html              # Minimal layout, no components
+└── pages/                      # Content layer
+    ├── index.html              # Page-specific content only
+    ├── players.html            # Page-specific content only
+    ├── player_basic.html       # Page-specific content only
+    └── player_detailed.html    # Page-specific content only
+
+static/
+├── css/
+│   ├── base.css               # Global styles only
+│   └── pages/                 # Page-specific styles
+│       ├── index.css
+│       ├── players.css
+│       └── player_*.css
+├── js/
+│   ├── base.js               # Global utilities only
+│   └── pages/                # Page-specific JavaScript
+│       ├── index.js
+│       ├── players.js
+│       └── player_*.js
+└── icons/                    # Static assets
+    └── character/
+```
+
+### Component Package Structure
+
+Each component is a **self-contained package** consisting of:
+
+#### Component Template (`_component.html`)
+- Contains HTML structure and Jinja2 macros
+- Imports its own CSS and JavaScript files
+- Provides reusable macros for layouts to use
+
+#### Component CSS (`component.css`)
+- Self-contained styling for the component
+- Uses BEM methodology for class naming
+- Responsive design included
+
+#### Component JavaScript (`component.js`)
+- Component behavior and interactivity
+- Auto-initialization on page load
+- Exposes public API for external use
+
+### Template Inheritance & Component Flow
+
+```
+base.html (Bootstrap + base assets)
+    ↓ extends
+layouts/*.html (imports components)
+    ↓ extends  
+pages/*.html (page content only)
+```
+
+**Component Import Rules:**
+- ✅ **base.html** imports: Bootstrap, base.css, base.js ONLY
+- ✅ **layouts/** import components via `{% include %}` or `{% from %}`
+- ✅ **components/** are self-contained packages
+- ❌ **pages/** should NOT import components directly
+- ❌ **components/** should NOT import other components
+
+### Layout Responsibilities
+
+#### `base.html` - Foundation Layer
+**Purpose**: Minimal foundation shared by all pages
+**Imports**: Bootstrap CSS/JS, base.css, base.js ONLY
+**Responsibilities:**
+- HTML5 document structure
+- Bootstrap framework loading
+- Basic navigation shell
+- Core JavaScript utilities
+
+#### `layouts/simple.html` - Basic Layout
+**Purpose**: Standard layout for content pages
+**Components**: search, character_icons
+**Pages**: index.html, players.html, download.html, how_to.html
+
+#### `layouts/player.html` - Player Layout
+**Purpose**: Enhanced layout for player-focused pages  
+**Components**: search, character_icons, player_title, game_tables
+**Pages**: player_basic.html, player_detailed.html
+
+#### `layouts/error.html` - Error Layout
+**Purpose**: Specialized layout for error pages
+**Components**: None (minimal)
+**Pages**: error_*.html
+
 ## Features
 
 ### Player Analytics
@@ -170,37 +292,6 @@ utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
 - **Character Icons**: Visual character representations throughout the interface
 - **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
 - **Smart Search**: Flexible player search with case-insensitive matching
-
-## Frontend Architecture (Modular Design)
-
-```
-templates/
-├── base.html                 # Foundation template with core HTML structure
-├── layouts/
-│   ├── simple.html          # Minimal layout for basic pages
-│   ├── player.html          # Enhanced layout for player pages
-│   └── error.html           # Error page layout
-└── pages/
-    ├── index.html           # Homepage
-    ├── player_basic.html    # Basic player profile
-    ├── player_detailed.html # Advanced player statistics
-    └── players.html         # Player index page
-
-static/
-├── css/
-│   ├── base.css            # Core styles and variables
-│   ├── components/         # Reusable component styles
-│   └── pages/             # Page-specific styles
-└── js/
-    ├── base.js            # Global JavaScript utilities
-    ├── components/        # Reusable JavaScript components
-    └── pages/            # Page-specific JavaScript
-```
-
-**Template Inheritance Pattern:**
-- `base.html` → `layouts/*.html` → `pages/*.html`
-- Each layer adds specific functionality without duplicating code
-- Components are self-contained and reusable across pages
 
 ### Database Schema
 - **clients**: Registered client applications with metadata
@@ -233,7 +324,6 @@ All data modification endpoints require API key authentication via `X-API-Key` h
 ### Quick Start
 
 #### Windows Development Setup
-For Windows developers, use the included setup script:
 ```cmd
 # Clone repository
 git clone <repository-url>
@@ -242,13 +332,6 @@ cd slippi_stats
 # Run the Windows setup script
 start_dev.bat
 ```
-
-The `start_dev.bat` script automatically:
-- Creates a Python virtual environment
-- Installs all dependencies from requirements.txt
-- Sets up Flask development environment variables
-- Initializes the database
-- Starts the development server at http://127.0.0.1:5000
 
 #### Manual Setup (All Platforms)
 ```bash
@@ -276,14 +359,42 @@ export DATABASE_PATH=/path/to/production.db
 
 ## Development Guidelines
 
-### Current Architecture Benefits
-✅ **Clean Separation**: Database, business logic, and HTTP handling are clearly separated
-✅ **Testability**: Each layer can be tested independently
-✅ **Maintainability**: Changes in one layer don't affect others
-✅ **Reusability**: Shared business logic in utils, service-specific logic in service modules
-✅ **Consistency**: Both web and API use same underlying data processing
+### Component Development
 
-### Adding New Functionality
+#### Creating New Components
+1. **Create component directory**: `templates/components/component_name/`
+2. **Create template file**: `_component_name.html` with macros
+3. **Create CSS file**: `component_name.css` with component styles
+4. **Create JS file**: `component_name.js` with component behavior
+5. **Import assets in template**: CSS and JS files loaded by template
+
+#### Component Structure Example
+```
+templates/components/search/
+├── _search.html              # Template with macros
+├── search.css               # Component-specific styles  
+└── search.js                # Component behavior
+
+# In _search.html:
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/search.css') }}">
+<script src="{{ url_for('static', filename='js/components/search.js') }}"></script>
+
+{% macro search_form() %}
+  <!-- Component HTML -->
+{% endmacro %}
+```
+
+#### Layout Integration
+```jinja2
+<!-- In layouts/simple.html -->
+{% include 'components/search/_search.html' %}
+{% include 'components/character_icons/_character_icons.html' %}
+
+<!-- Use component macros -->
+{{ search.search_form() }}
+```
+
+### Backend Integration
 
 #### 1. Database Operations
 ```python
@@ -352,21 +463,23 @@ def api_tournament_data(id):
 - [x] Update services to use new architecture
 - [x] Fix all import dependencies and circular references
 
-### Current State: ✅ PRODUCTION READY
-The application now has a clean, maintainable architecture with:
-- **Pure data access layer** (database.py)
-- **Shared business logic** (utils.py)  
-- **Service-specific logic** (web_service.py, api_service.py)
-- **Clean HTTP handling** (app.py)
-- **Comprehensive error handling** and logging
-- **No circular dependencies** or architectural violations
+### 🔄 Phase 4: Component Architecture (IN PROGRESS)
+- [ ] Implement component-based frontend architecture
+- [ ] Create self-contained component packages
+- [ ] Update layouts to orchestrate components
+- [ ] Eliminate direct CSS/JS imports in layouts
 
-## Future Enhancements (Optional)
+### Current State: ✅ PRODUCTION READY (Backend)
+The backend has a clean, maintainable architecture. The frontend is transitioning to a component-based approach for improved maintainability and reusability.
 
-### Potential Phase 4: Route Extraction (Optional)
-- [ ] Move routes to `routes/web_routes.py` and `routes/api_routes.py`
-- [ ] Create unified `services.py` combining web and API services
-- [ ] Add comprehensive middleware and request processing
+## Future Enhancements
+
+### Frontend Component System
+- [ ] Search component package
+- [ ] Character icons component package
+- [ ] Game tables component package  
+- [ ] Player title component package
+- [ ] Statistics cards component package
 
 ### Feature Enhancements
 - [ ] Advanced matchup analysis
@@ -384,20 +497,13 @@ The application now has a clean, maintainable architecture with:
 
 ### Code Style
 - **Backend**: Follow PEP 8 for Python code
+- **Frontend**: Component-based architecture with self-contained packages
 - **Module Structure**: Follow the defined import hierarchy and naming conventions
-- **No Circular Imports**: Services cannot import from each other
-- **Pure Data Access**: Database layer must remain free of business logic
+- **Components**: Self-contained template/CSS/JS packages
 
 ### Testing
 - Database functions should be testable with in-memory SQLite
 - Service functions should have comprehensive unit tests
 - Utils functions should be independently testable
+- Components should be testable in isolation
 - API endpoints should have proper error handling and validation
-
-## License
-
-[Add your license information here]
-
-## Support
-
-[Add support/contact information here]

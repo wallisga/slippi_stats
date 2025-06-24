@@ -1,0 +1,67 @@
+{# 
+Search Component Package - Self-contained search functionality
+File: frontend/components/search/_search.html
+#}
+
+{# Component manages its own assets #}
+<link rel="stylesheet" href="{{ url_for('static', filename='components/search/search.css') }}">
+<script src="{{ url_for('static', filename='components/search/search.js') }}"></script>
+
+{# ============================================================================= #}
+{# NAVBAR SEARCH MACRO #}
+{# ============================================================================= #}
+{% macro navbar_search(show=true, placeholder="Find Player...") %}
+{% if show %}
+<form class="d-flex navbar-search" id="playerSearchForm">
+    <input class="form-control me-2" 
+           type="search" 
+           placeholder="{{ placeholder }}" 
+           aria-label="Search" 
+           id="playerCodeInput">
+    <button class="btn btn-outline-light" type="submit">
+        <i class="bi bi-search"></i>
+    </button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{# ============================================================================= #}
+{# FILTER SEARCH MACRO #}
+{# ============================================================================= #}
+{% macro filter_search(target="playersTable", placeholder="Search players...", show_count=true) %}
+<div class="search-container mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-funnel"></i></span>
+                <input type="search" 
+                       class="form-control" 
+                       placeholder="{{ placeholder }}"
+                       id="playerSearch"
+                       data-target="{{ target }}"
+                       autocomplete="off">
+                <button type="button" 
+                        class="btn btn-outline-secondary" 
+                        onclick="document.getElementById('playerSearch').value=''; window.filterPlayers && filterPlayers();">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        {% if show_count %}
+        <div class="col-md-4">
+            <div class="d-flex justify-content-md-end justify-content-center mt-3 mt-md-0">
+                <span class="text-muted">
+                    Showing <strong id="visibleCount">0</strong> of <strong id="playerCount">0</strong> players
+                </span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- No results alert (hidden by default) -->
+    <div id="noResults" class="alert alert-info mt-3" style="display: none;">
+        <i class="bi bi-info-circle me-2"></i>
+        No players found matching your search criteria.
+    </div>
+</div>
+{% endmacro %}

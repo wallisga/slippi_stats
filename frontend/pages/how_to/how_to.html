@@ -1,0 +1,157 @@
+{% extends "layouts/simple.html" %}
+
+{% block title %}How to Use Slippi Stats Client | Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pages/how_to/how_to.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <h1 class="page-header text-center mb-5">How to Use Slippi Stats Client</h1>
+        
+        <div class="alert alert-setup p-4 mb-4">
+            <h4><i class="bi bi-info-circle me-2"></i>Installation Complete</h4>
+            <p class="mb-0">Thank you for downloading the Slippi Stats Client! Follow the instructions below to set up and use the client.</p>
+        </div>
+        
+        <div class="card instruction-card">
+            <div class="card-body p-4">
+                <h3 class="card-title mb-4">
+                    <i class="bi bi-download me-2 text-primary"></i>Installation and Setup
+                </h3>
+                
+                <div class="step-container">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h5>Run the Installer</h5>
+                        <p>Locate the downloaded MSI installer file (SlippiStatsClient.msi) and double-click to run it. Follow the installation wizard to complete the setup.</p>
+                        <p>You may need to allow the application through your firewall when prompted.</p>
+                        <img src="{{ url_for('static', filename='pages/how_to/images/install-wizard.png') }}" alt="Installation Wizard" class="screenshot" onerror="this.style.display='none'">
+                    </div>
+                </div>
+                
+                <div class="step-container">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h5>First Launch</h5>
+                        <p>After installation, the Slippi Stats Client will automatically launch and appear in your system tray. Look for the Slippi Stats icon <i class="bi bi-controller text-primary"></i> in the system tray.</p>
+                        <p>On first launch, you'll be asked to configure your settings.</p>
+                        <img src="{{ url_for('static', filename='pages/how_to/images/system-tray.png') }}" alt="System Tray Icon" class="screenshot" onerror="this.style.display='none'">
+                    </div>
+                </div>
+                
+                <div class="step-container">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h5>Configure Settings</h5>
+                        <p>Right-click on the system tray icon and select <strong>Open Settings</strong> to configure the client:</p>
+                        <ul class="settings-list">
+                            <li><strong>Replay Directory</strong>: Set the path to your Slippi replay files (typically <code class="path-code">Documents/Slippi</code>)</li>
+                            <li><strong>Server URL</strong>: The server is pre-configured, but you can change it if needed</li>
+                            <li><strong>Upload Interval</strong>: How often the client checks for and uploads new replay files</li>
+                        </ul>
+                        <img src="{{ url_for('static', filename='pages/how_to/images/settings-panel.png') }}" alt="Settings Panel" class="screenshot" onerror="this.style.display='none'">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card instruction-card mt-4">
+            <div class="card-body p-4">
+                <h3 class="card-title mb-4">
+                    <i class="bi bi-gear me-2 text-success"></i>Using the Client
+                </h3>
+                
+                <div class="step-container">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h5>System Tray Options</h5>
+                        <p>Right-clicking on the system tray icon gives you these options:</p>
+                        <ul class="options-list">
+                            <li><i class="bi bi-gear-fill me-2 text-primary"></i><strong>Open Settings</strong>: Configure client settings and check connection status</li>
+                            <li><i class="bi bi-file-text me-2 text-info"></i><strong>View Logs</strong>: View upload history and any errors</li>
+                            <li><i class="bi bi-x-circle me-2 text-danger"></i><strong>Exit</strong>: Close the client</li>
+                        </ul>
+                        <img src="{{ url_for('static', filename='pages/how_to/images/tray-menu.png') }}" alt="System Tray Menu" class="screenshot" onerror="this.style.display='none'">
+                    </div>
+                </div>
+                
+                <div class="step-container">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h5>Check Upload Status</h5>
+                        <p>In the Settings panel, you can see the connection status and how many files have been uploaded. A green <span class="status-indicator success">Connected</span> indicator shows that the client is working properly.</p>
+                        <p>You can manually trigger an upload by clicking the <button class="btn btn-sm btn-outline-primary" disabled>Upload Now</button> button in the settings panel.</p>
+                    </div>
+                </div>
+                
+                <div class="step-container">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <h5>Automatic Operation</h5>
+                        <p>Once configured, the client will automatically run in the background and upload your replay files according to your settings. No further action is required!</p>
+                        <p>The client will start automatically when you log in to your computer.</p>
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle me-2"></i>
+                            <strong>Setup Complete!</strong> Your replays will now be automatically uploaded.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card instruction-card mt-4">
+            <div class="card-body p-4">
+                <h3 class="card-title mb-4">
+                    <i class="bi bi-tools me-2 text-warning"></i>Troubleshooting
+                </h3>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="troubleshooting-section">
+                            <h5><i class="bi bi-exclamation-triangle me-2 text-warning"></i>No Files Uploading</h5>
+                            <ul class="troubleshooting-list">
+                                <li>Verify your replay directory is correct in settings</li>
+                                <li>Check your internet connection</li>
+                                <li>View logs for specific error messages</li>
+                                <li>Try clicking "Upload Now" to force an upload</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-4">
+                        <div class="troubleshooting-section">
+                            <h5><i class="bi bi-wifi-off me-2 text-danger"></i>Connection Issues</h5>
+                            <ul class="troubleshooting-list">
+                                <li>Ensure the server URL is correct</li>
+                                <li>Check your firewall settings</li>
+                                <li>Restart the client by right-clicking the icon and selecting "Exit", then relaunch</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-question-circle me-2"></i>Need Help?</h5>
+                    <p class="mb-0">If you're experiencing issues that aren't resolved by these steps, please contact us at <a href="mailto:support@slippistats.com" class="alert-link">support@slippistats.com</a>.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-5 mb-5">
+            <a href="/" class="btn btn-primary btn-lg cta-button">
+                <i class="bi bi-graph-up me-2"></i>Go to Stats Dashboard
+            </a>
+            <a href="/download" class="btn btn-outline-secondary btn-lg ms-3">
+                <i class="bi bi-download me-2"></i>Download Again
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='pages/how_to/how_to.js') }}"></script>
+{% endblock %}

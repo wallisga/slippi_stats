@@ -1,0 +1,29 @@
+<!-- frontend/pages/player_basic/player_basic.html -->
+{% extends "layouts/player.html" %}
+
+{% block title %}{{ player_code }} | Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pages/player_basic/player_basic.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Player content using component macros -->
+<div class="row">
+    <!-- Overview Stats -->
+    <div class="col-md-8">
+        {{ performance_overview_card(stats) }}
+    </div>
+    
+    <div class="col-md-4">
+        {{ highlights_card(stats) }}
+    </div>
+</div>
+
+<!-- Recent Games Table -->
+{{ recent_games_table(recent_games) }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='pages/player_basic/player_basic.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,22 @@
+/* Player Detailed Page Specific Styles - Only page-specific styles */
+
+/* Page-specific layout */
+.table-section {
+    margin-bottom: 2rem;
+}
+
+.scrollable-table {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Page-specific responsive design */
+@media (max-width: 768px) {
+    .scrollable-table {
+        max-height: 200px;
+    }
+    
+    .table-section .col-md-4 {
+        margin-bottom: 1rem;
+    }
+}

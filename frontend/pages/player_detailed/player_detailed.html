@@ -1,0 +1,55 @@
+{% extends "layouts/player.html" %}
+
+{% block title %}{{ player_code }} | Detailed Stats | Slippi Stats{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pages/player_detailed/player_detailed.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Advanced Filters Card -->
+{{ advanced_filters_card() }}
+
+<!-- Performance Summary Row -->
+<div class="row mb-4">
+    <div class="col-md-5">
+        {{ win_rate_circle_card("Overall Performance", "overall") }}
+    </div>
+    <div class="col-md-7">
+        {{ filter_summary_card() }}
+    </div>
+</div>
+
+<!-- Stats Tables Row -->
+<div class="row table-section">
+    <div class="col-md-4 mb-4">
+        {{ detailed_stats_table("Character Stats", "character-stats", "character") }}
+    </div>
+    <div class="col-md-4 mb-4">
+        {{ detailed_stats_table("Opponent Stats", "opponent-stats", "opponent") }}
+    </div>
+    <div class="col-md-4 mb-4">
+        {{ detailed_stats_table("Matchup Stats", "matchup-stats", "matchup") }}
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        {{ chart_card("Win Rate Over Time", "timeChart") }}
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        {{ chart_card("Character Performance", "characterChart") }}
+    </div>
+</div>
+
+<!-- Loading Overlay Component -->
+{{ loading_overlay() }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='pages/player_detailed/player_detailed.js') }}"></script>
+{% endblock %}

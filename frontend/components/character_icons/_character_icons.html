@@ -1,0 +1,11 @@
+{# 
+Character Icons Component Package
+File: frontend/components/character_icons/_character_icons.html
+#}
+
+{# Component manages its own assets #}
+<link rel="stylesheet" href="{{ url_for('static', filename='components/character_icons/character_icons.css') }}">
+<script src="{{ url_for('static', filename='components/character_icons/character_icons.js') }}"></script>
+
+{# Character icons are automatically initialized by the JavaScript component #}
+{# Just add data-character-name="Character Name" to any element #}
