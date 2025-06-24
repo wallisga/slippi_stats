@@ -5,9 +5,9 @@ This module contains business logic functions specifically for API endpoints.
 Functions here prepare data for JSON responses and handle API-specific concerns.
 """
 
-from config import get_config
-from utils import decode_player_tag, process_raw_games_for_player
-from database import (
+from backend.config import get_config
+from backend.utils import decode_player_tag, process_raw_games_for_player
+from backend.database import (
     get_database_stats, create_client_record, update_clients_info,
     create_api_key_record, update_api_key_record, check_client_exists,
     create_game_record, check_game_exists, validate_api_key,

@@ -11,7 +11,7 @@ import logging
 import secrets
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from config import get_config
+from backend.config import get_config
 
 # Get configuration
 config = get_config()

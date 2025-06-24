@@ -6,13 +6,13 @@ Functions here prepare data for HTML templates and handle web-specific concerns.
 """
 
 from datetime import datetime
-from config import get_config
-from utils import (
+from backend.config import get_config
+from backend.utils import (
     encode_player_tag, decode_player_tag,
     process_raw_games_for_player, find_flexible_player_matches,
     extract_player_stats_from_games, process_recent_games_data
 )
-from database import (
+from backend.database import (
     get_games_all, get_games_recent, get_database_stats
 )
 

@@ -34,13 +34,11 @@ from flask import Flask, render_template, request, jsonify, abort, redirect, sen
 # App Modules
 # =============================================================================
 
-from config import get_config
-from utils import decode_player_tag, get_error_template_data
-from database import init_db, validate_api_key
-
-# Import service modules
-import web_service
-import api_service
+from backend.config import get_config
+from backend.utils import decode_player_tag, get_error_template_data
+from backend.database import init_db, validate_api_key
+import backend.web_service as web_service
+import backend.api_service as api_service
 
 # =============================================================================
 # Application Initialization
