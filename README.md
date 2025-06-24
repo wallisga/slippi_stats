@@ -1,6 +1,6 @@
 # Slippi Stats Server
 
-A comprehensive web application for collecting, storing, and analyzing Super Smash Bros. Melee game data from Slippi replays. Built with Flask and featuring a modular architecture with real-time filtering and detailed player statistics.
+A comprehensive web application for collecting, storing, and analyzing Super Smash Bros. Melee game data from Slippi replays. Built with Flask and featuring a component-based frontend with real-time filtering and detailed player statistics.
 
 ## Overview
 
@@ -11,271 +11,97 @@ Slippi Stats Server provides:
 - **RESTful API** for programmatic access to game data
 - **Client Registration System** for automated replay collection
 
-## Architecture & Module Design
+## Quick Start
 
-### Backend Module Structure (Current State)
-```
-app.py                 # Entry point & Flask application setup
-├── config.py          # Configuration & environment management
-├── utils.py           # Shared utilities & business logic helpers
-├── database.py        # Pure data access layer (no business logic)
-├── web_service.py     # Web-specific business logic & template data
-├── api_service.py     # API-specific business logic & JSON responses
-└── [FUTURE]
-    ├── services.py    # Unified business logic layer [PLANNED]
-    └── routes/        # HTTP route handlers [PLANNED]
-        ├── web_routes.py  # HTML page routes
-        └── api_routes.py  # JSON API endpoints
-```
+### Prerequisites
+- Python 3.8+
+- SQLite 3 (included with Python)
+- Modern web browser with JavaScript enabled
+- Git (for development)
 
-### Current Module Responsibilities
+### Windows Development Setup
+```cmd
+# Clone repository
+git clone <repository-url>
+cd slippi_stats
 
-#### **config.py** - Configuration Management ✅ COMPLETE
-**Purpose**: Centralized configuration and environment settings
-
-**Contains:**
-- Environment variable handling (`get_config()`)
-- Application settings and constants
-- Logging configuration (`init_logging()`)
-- Database paths and connection settings
-- Feature flags and limits
-
-**Import Rules**: Cannot import any other app modules
-**Status**: Stable, well-structured
-
-#### **utils.py** - Shared Utilities & Business Logic Helpers ✅ COMPLETE
-**Purpose**: Helper functions and shared business logic used across multiple modules
-
-**Contains:**
-- URL encoding/decoding (`encode_player_tag()`, `decode_player_tag()`)
-- Error template data (`get_error_template_data()`)
-- **Game Data Processing** (shared between services):
-  - `parse_player_data_from_game()` - Parse JSON player data
-  - `find_player_in_game_data()` - Find specific player in game
-  - `safe_get_player_field()` - Safe field extraction
-  - `process_raw_games_for_player()` - Process games for specific player
-  - `find_flexible_player_matches()` - Player search with fuzzy matching
-  - `extract_player_stats_from_games()` - Extract player rankings
-  - `process_recent_games_data()` - Format recent games for display
-
-**Import Rules**: Can only import `config`
-**Status**: Complete with comprehensive game processing functions
-
-#### **database.py** - Pure Data Access Layer ✅ COMPLETE  
-**Purpose**: Raw database operations ONLY - no business logic
-
-**Contains:**
-- Database connection management (`DatabaseManager` class)
-- Table-specific CRUD operations
-- Raw SQL queries and data retrieval
-- Database initialization (`init_db()`)
-
-**Key Functions (Table-Organized):**
-- **Games**: `get_games_all()`, `get_games_recent()`, `create_game_record()`
-- **Clients**: `get_clients_all()`, `create_client_record()`, `update_clients_info()`
-- **API Keys**: `get_api_keys_*()`, `create_api_key_record()`, `validate_api_key()`
-- **Statistics**: `get_database_stats()` (simple aggregation only)
-
-**Import Rules**: Can import `config` only
-**Status**: Complete refactoring - pure data access, no business logic
-
-#### **web_service.py** - Web Business Logic ✅ COMPLETE
-**Purpose**: Business logic for web page rendering and template data preparation
-
-**Contains:**
-- Template data preparation (`prepare_homepage_data()`, `prepare_all_players_data()`)
-- Player statistics calculation (`calculate_player_stats()`)
-- Data access wrappers that combine database + utils processing
-- Request handling logic (`process_player_profile_request()`)
-
-**Import Rules**: Can import `database`, `utils`, `config`
-**Status**: Complete with clean separation from database layer
-
-#### **api_service.py** - API Business Logic ✅ COMPLETE
-**Purpose**: Business logic for JSON API responses and API-specific concerns
-
-**Contains:**
-- API data processing (`process_detailed_player_data()`, `process_paginated_player_games()`)
-- Advanced filtering logic (`apply_game_filters()`, `calculate_filtered_stats()`)
-- Client management (`register_or_update_client()`, `upload_games_for_client()`)
-- Request validation and error handling
-
-**Import Rules**: Can import `database`, `utils`, `config`
-**Status**: Complete with comprehensive API functionality
-
-#### **app.py** - Flask Application ✅ COMPLETE
-**Purpose**: Flask application setup, route definitions, and HTTP handling
-
-**Contains:**
-- Flask app configuration and initialization
-- Route handlers for both web and API endpoints
-- Authentication decorators (`require_api_key`, `rate_limited`)
-- Error handlers for all HTTP status codes
-- Static file serving
-
-**Import Rules**: Can import all service modules
-**Status**: Clean and well-organized with proper service separation
-
-### Data Flow Architecture (Current)
-
-```
-HTTP Request → app.py Route → Service Layer → Utils + Database → Response
+# Run the Windows setup script
+start_dev.bat
 ```
 
-**Detailed Flow:**
-1. **app.py** receives HTTP request and validates parameters
-2. **app.py** calls appropriate **Service** function (web_service or api_service)
-3. **Service** calls **Database** functions for raw data
-4. **Service** calls **Utils** functions for data processing
-5. **Service** applies business logic and returns processed data
-6. **app.py** formats response (HTML template or JSON)
-7. **app.py** returns HTTP response
+The development server will be available at: http://127.0.0.1:5000
 
-### Current Module Import Hierarchy
+### Manual Setup (All Platforms)
+```bash
+# Clone repository
+git clone <repository-url>
+cd slippi_stats
 
-```
-app.py (Flask routes & HTTP handling)        # Top level
-    ↓ can import
-web_service.py + api_service.py              # Business logic layers
-    ↓ can import  
-utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
-```
+# Create virtual environment
+python -m venv venv
 
-**Import Rules (Enforced):**
-- ✅ Services can import: `database`, `utils`, `config`
-- ✅ Utils can import: `config` only
-- ✅ Database can import: `config` only
-- ✅ App can import: all modules
-- ❌ No circular imports between services
-- ❌ Database cannot import services or utils
-- ❌ Utils cannot import database or services
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
 
-## Frontend Architecture (Component-Based Design)
+# Install dependencies
+pip install -r requirements.txt
 
-### Component Architecture Philosophy
-
-The frontend follows a **component-based architecture** where:
-
-1. **Components are self-contained packages** - Each component includes its own template, CSS, and JavaScript
-2. **Layouts orchestrate components** - Layouts import and compose components as needed
-3. **Base template is minimal** - Only includes Bootstrap, base.css, and base.js
-4. **Pages focus on content** - Page-specific functionality only, no component imports
-
-### Directory Structure
-
-```
-templates/
-├── base.html                    # Foundation: Bootstrap + base assets only
-├── components/                  # Self-contained component packages
-│   ├── search/
-│   │   ├── _search.html        # Template
-│   │   ├── search.css          # Styles (loaded by template)
-│   │   └── search.js           # Behavior (loaded by template)
-│   ├── character_icons/
-│   │   ├── _character_icons.html
-│   │   ├── character_icons.css
-│   │   └── character_icons.js
-│   ├── player_title/
-│   │   ├── _player_title.html
-│   │   ├── player_title.css
-│   │   └── player_title.js
-│   └── game_table/
-│       ├── _game_table.html
-│       ├── game_table.css
-│       └── game_table.js
-├── layouts/                     # Component orchestration layer
-│   ├── simple.html             # Imports: search, character_icons
-│   ├── player.html             # Imports: search, character_icons, player_title
-│   └── error.html              # Minimal layout, no components
-└── pages/                      # Content layer
-    ├── index.html              # Page-specific content only
-    ├── players.html            # Page-specific content only
-    ├── player_basic.html       # Page-specific content only
-    └── player_detailed.html    # Page-specific content only
-
-static/
-├── css/
-│   ├── base.css               # Global styles only
-│   └── pages/                 # Page-specific styles
-│       ├── index.css
-│       ├── players.css
-│       └── player_*.css
-├── js/
-│   ├── base.js               # Global utilities only
-│   └── pages/                # Page-specific JavaScript
-│       ├── index.js
-│       ├── players.js
-│       └── player_*.js
-└── icons/                    # Static assets
-    └── character/
+# Run development server
+python app.py
 ```
 
-### Component Package Structure
-
-Each component is a **self-contained package** consisting of:
-
-#### Component Template (`_component.html`)
-- Contains HTML structure and Jinja2 macros
-- Imports its own CSS and JavaScript files
-- Provides reusable macros for layouts to use
-
-#### Component CSS (`component.css`)
-- Self-contained styling for the component
-- Uses BEM methodology for class naming
-- Responsive design included
-
-#### Component JavaScript (`component.js`)
-- Component behavior and interactivity
-- Auto-initialization on page load
-- Exposes public API for external use
-
-### Template Inheritance & Component Flow
+## Project Structure
 
 ```
-base.html (Bootstrap + base assets)
-    ↓ extends
-layouts/*.html (imports components)
-    ↓ extends  
-pages/*.html (page content only)
+slippi_stats/
+├── README.md                    # This file - project overview
+├── requirements.txt             # Python dependencies
+├── start_dev.bat               # Windows development script
+├── app.py                      # Flask application entry point
+├── config.py                   # Configuration management
+├── database.py                 # Data access layer
+├── web_service.py              # Web page business logic
+├── api_service.py              # API business logic
+├── utils.py                    # Shared utilities
+├── backend/                    # Backend documentation and future expansion
+│   └── README.md              # Backend architecture details
+└── frontend/                  # Component-based frontend
+    ├── README.md              # Frontend architecture details
+    ├── base.html              # Foundation template
+    ├── base.css               # Global styles
+    ├── base.js                # Global utilities
+    ├── components/            # Self-contained UI components
+    ├── layouts/               # Component orchestration
+    └── pages/                 # Page-specific content
 ```
 
-**Component Import Rules:**
-- ✅ **base.html** imports: Bootstrap, base.css, base.js ONLY
-- ✅ **layouts/** import components via `{% include %}` or `{% from %}`
-- ✅ **components/** are self-contained packages
-- ❌ **pages/** should NOT import components directly
-- ❌ **components/** should NOT import other components
+## Architecture
 
-### Layout Responsibilities
+This project follows a **modular architecture** with clear separation of concerns:
 
-#### `base.html` - Foundation Layer
-**Purpose**: Minimal foundation shared by all pages
-**Imports**: Bootstrap CSS/JS, base.css, base.js ONLY
-**Responsibilities:**
-- HTML5 document structure
-- Bootstrap framework loading
-- Basic navigation shell
-- Core JavaScript utilities
+### Backend Architecture
+- **Flask Application** with service-oriented design
+- **Component-based Business Logic** separated into web and API services
+- **Pure Data Access Layer** with no business logic mixing
+- **Shared Utilities** for common functionality across services
 
-#### `layouts/simple.html` - Basic Layout
-**Purpose**: Standard layout for content pages
-**Components**: search, character_icons
-**Pages**: index.html, players.html, download.html, how_to.html
+For detailed backend architecture, see [backend/README.md](backend/README.md)
 
-#### `layouts/player.html` - Player Layout
-**Purpose**: Enhanced layout for player-focused pages  
-**Components**: search, character_icons, player_title, game_tables
-**Pages**: player_basic.html, player_detailed.html
+### Frontend Architecture
+- **Component-based Design** with self-contained packages
+- **Template Inheritance** following base → layout → page pattern
+- **Asset Management** where components own their CSS/JS
+- **Bootstrap Integration** with modern responsive design
 
-#### `layouts/error.html` - Error Layout
-**Purpose**: Specialized layout for error pages
-**Components**: None (minimal)
-**Pages**: error_*.html
+For detailed frontend architecture, see [frontend/README.md](frontend/README.md)
 
 ## Features
 
 ### Player Analytics
-- **Basic Profiles**: Win rates, character usage, recent games, highlights
+- **Basic Profiles**: Win rates, character usage, recent games, performance highlights
 - **Detailed Analysis**: Advanced filtering by character, opponent, and matchup
 - **Performance Trends**: Time-series charts showing improvement over time
 - **Character Statistics**: Win rates and usage patterns for each character
@@ -293,11 +119,6 @@ pages/*.html (page content only)
 - **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
 - **Smart Search**: Flexible player search with case-insensitive matching
 
-### Database Schema
-- **clients**: Registered client applications with metadata
-- **games**: Individual game records with JSON player data  
-- **api_keys**: Authentication tokens for API access
-
 ## API Documentation
 
 ### Player Endpoints
@@ -313,42 +134,12 @@ pages/*.html (page content only)
 ### Authentication
 All data modification endpoints require API key authentication via `X-API-Key` header.
 
-## Installation & Setup
+## Configuration
 
-### Prerequisites
-- Python 3.8+
-- SQLite 3 (included with Python)
-- Modern web browser with JavaScript enabled
-- Git (for development)
-
-### Quick Start
-
-#### Windows Development Setup
-```cmd
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
-
-# Run the Windows setup script
-start_dev.bat
-```
-
-#### Manual Setup (All Platforms)
-```bash
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
-
-# Run development server
-start_dev.bat
-```
-
-### Configuration
-
-#### Development
+### Development
 For development, the application uses sensible defaults. No additional configuration required.
 
-#### Production
+### Production
 Set environment variables for production deployment:
 ```bash
 export FLASK_ENV=production
@@ -357,153 +148,56 @@ export SLIPPI_REGISTRATION_SECRET=your-registration-secret
 export DATABASE_PATH=/path/to/production.db
 ```
 
-## Development Guidelines
+## Database Schema
+- **clients**: Registered client applications with metadata
+- **games**: Individual game records with JSON player data  
+- **api_keys**: Authentication tokens for API access
 
-### Component Development
+## Development Status
 
-#### Creating New Components
-1. **Create component directory**: `templates/components/component_name/`
-2. **Create template file**: `_component_name.html` with macros
-3. **Create CSS file**: `component_name.css` with component styles
-4. **Create JS file**: `component_name.js` with component behavior
-5. **Import assets in template**: CSS and JS files loaded by template
+### ✅ Completed
+- **Backend Architecture**: Clean service-oriented design with separation of concerns
+- **Database Layer**: Pure data access with comprehensive CRUD operations
+- **Business Logic**: Separated into web and API service layers
+- **Configuration Management**: Centralized with environment variable support
+- **Error Handling**: Comprehensive validation and user feedback
 
-#### Component Structure Example
-```
-templates/components/search/
-├── _search.html              # Template with macros
-├── search.css               # Component-specific styles  
-└── search.js                # Component behavior
+### 🔄 In Progress
+- **Frontend Component System**: Migrating to component-based architecture
+- **Documentation Restructuring**: Decoupling architecture documentation
 
-# In _search.html:
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components/search.css') }}">
-<script src="{{ url_for('static', filename='js/components/search.js') }}"></script>
-
-{% macro search_form() %}
-  <!-- Component HTML -->
-{% endmacro %}
-```
-
-#### Layout Integration
-```jinja2
-<!-- In layouts/simple.html -->
-{% include 'components/search/_search.html' %}
-{% include 'components/character_icons/_character_icons.html' %}
-
-<!-- Use component macros -->
-{{ search.search_form() }}
-```
-
-### Backend Integration
-
-#### 1. Database Operations
-```python
-# Add to database.py with table-specific naming
-def get_games_by_stage(stage_id):
-    """Get all games played on specific stage."""
-    with db_manager.get_connection() as conn:
-        # Raw SQL only, no business logic
-        return conn.execute("SELECT * FROM games WHERE stage_id = ?", (stage_id,)).fetchall()
-```
-
-#### 2. Shared Business Logic
-```python
-# Add to utils.py for cross-service functionality
-def process_stage_statistics(raw_games):
-    """Process raw games to extract stage statistics."""
-    # Shared data processing logic
-    pass
-```
-
-#### 3. Service-Specific Logic
-```python
-# Add to web_service.py for web pages
-def prepare_tournament_page_data():
-    """Prepare data for tournament page rendering."""
-    raw_games = get_games_all()
-    return process_tournament_data(raw_games)
-
-# Add to api_service.py for API endpoints  
-def process_tournament_api_request(tournament_id, filters):
-    """Process tournament API request with filtering."""
-    raw_games = get_games_by_tournament(tournament_id)
-    return apply_tournament_filters(raw_games, filters)
-```
-
-#### 4. Route Handlers
-```python
-# Add to app.py with clear separation
-@app.route('/tournaments')
-def web_tournaments():
-    data = web_service.prepare_tournament_page_data()
-    return render_template('pages/tournaments.html', **data)
-
-@app.route('/api/tournaments/<id>')
-def api_tournament_data(id):
-    result = api_service.process_tournament_api_request(id, request.json)
-    return jsonify(result)
-```
-
-## Completed Refactoring Status
-
-### ✅ Phase 1: Configuration & Database (COMPLETE)
-- [x] Extract configuration to `config.py`
-- [x] Centralize database operations in `database.py`
-- [x] Implement proper logging and error handling
-
-### ✅ Phase 2: Services & Utilities (COMPLETE)
-- [x] Extract utilities to `utils.py`
-- [x] Create `web_service.py` for web-specific business logic
-- [x] Create `api_service.py` for API-specific business logic
-- [x] Maintain clean separation between services
-
-### ✅ Phase 3: Data Layer Refactoring (COMPLETE)
-- [x] Refactor `database.py` to pure data access layer
-- [x] Move business logic from database to `utils.py`
-- [x] Update services to use new architecture
-- [x] Fix all import dependencies and circular references
-
-### 🔄 Phase 4: Component Architecture (IN PROGRESS)
-- [ ] Implement component-based frontend architecture
-- [ ] Create self-contained component packages
-- [ ] Update layouts to orchestrate components
-- [ ] Eliminate direct CSS/JS imports in layouts
-
-### Current State: ✅ PRODUCTION READY (Backend)
-The backend has a clean, maintainable architecture. The frontend is transitioning to a component-based approach for improved maintainability and reusability.
-
-## Future Enhancements
-
-### Frontend Component System
-- [ ] Search component package
-- [ ] Character icons component package
-- [ ] Game tables component package  
-- [ ] Player title component package
-- [ ] Statistics cards component package
-
-### Feature Enhancements
-- [ ] Advanced matchup analysis
-- [ ] Player comparison tools
-- [ ] Export functionality for statistics
-- [ ] Tournament bracket system
-
-### Performance Improvements
-- [ ] Database query optimization
-- [ ] Frontend bundle optimization
-- [ ] Caching layer implementation
-- [ ] Connection pooling
+### 📋 Planned
+- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
+- **Performance Optimization**: Database query optimization and caching
+- **Export Features**: Statistics export and tournament bracket system
 
 ## Contributing
 
-### Code Style
-- **Backend**: Follow PEP 8 for Python code
-- **Frontend**: Component-based architecture with self-contained packages
-- **Module Structure**: Follow the defined import hierarchy and naming conventions
-- **Components**: Self-contained template/CSS/JS packages
+### Development Guidelines
+- **Backend**: Follow the established service layer pattern and module import hierarchy
+- **Frontend**: Use the component-based architecture with self-contained packages
+- **Code Style**: Follow PEP 8 for Python, component patterns for frontend
+- **Testing**: Database functions should be testable with in-memory SQLite
 
-### Testing
-- Database functions should be testable with in-memory SQLite
-- Service functions should have comprehensive unit tests
-- Utils functions should be independently testable
-- Components should be testable in isolation
-- API endpoints should have proper error handling and validation
+### Getting Started
+1. Fork the repository
+2. Create a feature branch
+3. Set up development environment using `start_dev.bat` or manual setup
+4. Make your changes following the architecture patterns
+5. Test your changes thoroughly
+6. Submit a pull request
+
+### Architecture Documentation
+- For backend development details: [backend/README.md](backend/README.md)
+- For frontend development details: [frontend/README.md](frontend/README.md)
+
+## License
+
+This project is open source. Please see the LICENSE file for details.
+
+## Support
+
+For issues, feature requests, or questions:
+1. Check existing issues in the repository
+2. Create a new issue with detailed description
+3. Follow the contributing guidelines for code submissions
