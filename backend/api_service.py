@@ -10,7 +10,7 @@ from backend.utils import decode_player_tag, process_raw_games_for_player
 from backend.database import (
     get_database_stats, create_client_record, update_clients_info,
     create_api_key_record, update_api_key_record, check_client_exists,
-    create_game_record, check_game_exists, validate_api_key,
+    create_game_record, check_game_exists, validate_api_key, get_games_all,
     update_clients_last_active
 )
 
@@ -25,8 +25,6 @@ logger = config.init_logging()
 def get_player_games(player_code):
     """Get all games for a specific player."""
     try:
-        from database import get_games_all
-        # Get all games from database
         raw_games = get_games_all()
         # Process them for the specific player
         return process_raw_games_for_player(raw_games, player_code)

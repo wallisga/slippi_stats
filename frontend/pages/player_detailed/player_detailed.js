@@ -121,7 +121,7 @@ async function fetchPlayerData(filters = {}) {
     try {
         const playerTemplateData = getPlayerDataFromTemplate();
         const playerCode = playerTemplateData.playerCode;
-        const encodedPlayerCode = encodeURIComponent(playerCode);
+        const encodedPlayerCode = playerTemplateData.encodedPlayerCode; // ← Use pre-encoded value
         
         if (!playerCode) {
             throw new Error('No player code available');
