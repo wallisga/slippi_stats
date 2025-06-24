@@ -4,7 +4,7 @@
 <script src="{{ url_for('static', filename='components/filters/filters.js') }}"></script>
 
 {# ============================================================================= #}
-{# ADVANCED FILTERS CARD MACRO #}
+{# ADVANCED FILTERS CARD MACRO - SIMPLIFIED #}
 {# ============================================================================= #}
 {% macro advanced_filters_card() %}
 <div class="card mb-4 filter-card">
@@ -45,25 +45,16 @@
 {% endmacro %}
 
 {# ============================================================================= #}
-{# FILTER COLUMN MACRO #}
+{# FILTER COLUMN MACRO - SIMPLIFIED (CHECKBOXES ONLY) #}
 {# ============================================================================= #}
 {% macro filter_column(label, filter_type, placeholder) %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-    <label class="form-label mb-0 fw-semibold">{{ label }}</label>
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="{{ filter_type }}FilterToggle" checked>
-        <label class="form-check-label small" for="{{ filter_type }}FilterToggle">Multi-select</label>
-    </div>
+<div class="mb-2">
+    <label class="form-label mb-2 fw-semibold">{{ label }}</label>
 </div>
-<select class="form-select form-select-sm" id="{{ filter_type }}Filter" style="display: none;">
-    <option value="all" selected>{{ placeholder }}</option>
-</select>
 <div class="filter-checkboxes-horizontal" id="{{ filter_type }}Checkboxes">
     <div class="checkbox-item select-all-option">
-        <div class="form-check">
-            <input class="form-check-input select-all" type="checkbox" id="selectAll{{ filter_type.title() }}s" checked>
-            <label class="form-check-label small" for="selectAll{{ filter_type.title() }}s">{{ placeholder }}</label>
-        </div>
+        <input class="form-check-input select-all" type="checkbox" id="selectAll{{ filter_type.title() }}s" checked>
+        <label class="form-check-label" for="selectAll{{ filter_type.title() }}s">{{ placeholder }}</label>
     </div>
 </div>
 {% endmacro %}

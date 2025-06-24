@@ -1,0 +1,85 @@
+{# frontend/components/navbar/_navbar.html #}
+{# Component manages its own assets #}
+<link rel="stylesheet" href="{{ url_for('static', filename='components/navbar/navbar.css') }}">
+<script src="{{ url_for('static', filename='components/navbar/navbar.js') }}"></script>
+
+{# Import dependencies for navbar functionality #}
+{% from 'components/search/_search.html' import navbar_search %}
+
+{# ============================================================================= #}
+{# NAVBAR MACRO #}
+{# ============================================================================= #}
+{% macro navbar(navbar_state="default", player_code=None, search_config=None) %}
+{# 
+  navbar_state options:
+  - "default": Basic navbar with standard nav items
+  - "simple": Minimal navbar for simple pages (homepage, static pages)
+  - "player": Player-focused navbar with player dropdown
+  - "error": Minimal navbar for error pages
+  
+  player_code: Required when navbar_state="player"
+  search_config: Optional dict with search configuration
+    - enabled: boolean (default True)
+    - placeholder: string (default "Search players...")
+    - autofocus: boolean (default False)
+#}
+
+{# Set default search config #}
+{% set search_config = search_config or {} %}
+{% set search_enabled = search_config.get('enabled', true) %}
+{% set search_placeholder = search_config.get('placeholder', 'Search players...') %}
+{% set search_autofocus = search_config.get('autofocus', false) %}
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" data-navbar-state="{{ navbar_state }}">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">Slippi Stats</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                {# Navigation items based on state #}
+                    
+                {% if navbar_state == "simple" %}
+                    {# Simple navbar for homepage and basic pages #}
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
+                    </li>
+                    
+                {% elif navbar_state == "error" %}
+                    {# Minimal navbar for error pages #}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/players">Players</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/download">Download</a>
+                    </li>
+                    
+                {% else %}
+                    {# Default navbar - can be customized by extending templates #}
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
+                    </li>
+                {% endif %}
+                
+                {# Additional nav items slot for custom extensions #}
+                {% block navbar_extra_items %}{% endblock %}
+            </ul>
+            
+            {# Right side of navbar #}
+            {% if search_enabled and navbar_state != "error" %}
+                {{ navbar_search(search_autofocus, search_placeholder) }}
+            {% endif %}
+            
+            {# Additional nav extras slot for custom extensions #}
+            {% block navbar_extra_content %}{% endblock %}
+        </div>
+    </div>
+</nav>
+{% endmacro %}

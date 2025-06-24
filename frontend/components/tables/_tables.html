@@ -33,18 +33,47 @@
                     <tr>
                         <td class="game-time">{{ game.start_time }}</td>
                         <td>
-                            <a href="/player/{{ game.opponent.encoded_tag }}" class="opponent-link">
-                                {{ game.opponent.player_tag }}
-                            </a>
+                            {# Handle encoding in template - check multiple possible attribute names #}
+                            {% if game.opponent.encoded_tag %}
+                                {% set encoded_tag = game.opponent.encoded_tag %}
+                            {% elif game.opponent.player_tag %}
+                                {% set encoded_tag = game.opponent.player_tag | urlencode %}
+                            {% elif game.opponent_tag %}
+                                {% set encoded_tag = game.opponent_tag | urlencode %}
+                            {% else %}
+                                {% set encoded_tag = '' %}
+                            {% endif %}
+                            
+                            {% if encoded_tag %}
+                                <a href="/player/{{ encoded_tag }}" class="opponent-link">
+                                    {{ game.opponent.player_tag or game.opponent_tag or 'Unknown' }}
+                                </a>
+                            {% else %}
+                                <span class="opponent-name">{{ game.opponent.player_tag or game.opponent_tag or 'Unknown' }}</span>
+                            {% endif %}
                         </td>
                         <td>
-                            <span data-character-name="{{ game.player.character_name }}" class="character-container me-2"></span>{{ game.player.character_name }}
-                            vs
-                            <span data-character-name="{{ game.opponent.character_name }}" class="character-container me-2"></span>{{ game.opponent.character_name }}
+                            {# Player character #}
+                            {% set player_char = game.player.character_name or game.player_character or 'Unknown' %}
+                            <span data-character-name="{{ player_char }}" class="character-container me-2"></span>{{ player_char }}
+                            <span class="text-muted mx-2">vs</span>
+                            {# Opponent character #}
+                            {% set opponent_char = game.opponent.character_name or game.opponent_character or 'Unknown' %}
+                            <span data-character-name="{{ opponent_char }}" class="character-container me-2"></span>{{ opponent_char }}
                         </td>
-                        <td class="stage-name">Stage {{ game.stage_id }}</td>
+                        <td class="stage-name">
+                            {% if game.stage_name %}
+                                {{ game.stage_name }}
+                            {% elif game.stage_id %}
+                                Stage {{ game.stage_id }}
+                            {% else %}
+                                Unknown Stage
+                            {% endif %}
+                        </td>
                         <td>
-                            <span class="result-{{ game.result.lower() }}">{{ game.result }}</span>
+                            <span class="result-{{ (game.result | lower) if game.result else 'unknown' }}">
+                                {{ game.result or 'Unknown' }}
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -114,4 +143,18 @@
         </div>
     </div>
 </div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# HELPER MACRO FOR ENCODING PLAYER TAGS #}
+{# ============================================================================= #}
+{% macro player_link(player_tag, display_name=None, css_class="player-link") %}
+{# Helper macro to create properly encoded player links #}
+{% if player_tag %}
+    <a href="/player/{{ player_tag | urlencode }}" class="{{ css_class }}">
+        {{ display_name or player_tag }}
+    </a>
+{% else %}
+    <span class="{{ css_class }} text-muted">{{ display_name or 'Unknown Player' }}</span>
+{% endif %}
 {% endmacro %}

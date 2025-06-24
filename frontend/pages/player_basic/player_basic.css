@@ -1,106 +1,8 @@
-/* Player Basic Page Specific Styles */
+/* Player Basic Page Specific Styles - CLEANED VERSION */
 
-/* Performance Overview Section */
-.stat-item {
-    padding: 1rem 0;
-    border-bottom: 1px solid #f8f9fa;
-}
+/* Only keep styles that aren't handled by components */
 
-.stat-item:last-child {
-    border-bottom: none;
-}
-
-.stat-item h6 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
-}
-
-.stat-item h3 {
-    font-weight: 700;
-    margin-bottom: 0;
-    font-size: 2rem;
-}
-
-.stat-item h4 {
-    font-weight: 600;
-    margin-bottom: 0;
-    display: flex;
-    align-items: center;
-}
-
-/* Highlights Section */
-.highlight-item {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f8f9fa;
-}
-
-.highlight-item:last-child {
-    border-bottom: none;
-}
-
-.highlight-item h6 {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #6c757d !important;
-}
-
-.highlight-item .fw-bold {
-    font-size: 1rem;
-}
-
-.highlight-item small {
-    font-size: 0.75rem;
-    line-height: 1.2;
-}
-
-/* Character Icons in Stats */
-.character-container {
-    display: inline-flex;
-    align-items: center;
-}
-
-/* Card Header Icons */
-.card-header i {
-    color: #0d6efd;
-    font-size: 1.1rem;
-}
-
-.card-header h5 {
-    margin-bottom: 0;
-    font-weight: 600;
-}
-
-/* Games Table Enhancements */
-.games-table .result-win {
-    color: #198754;
-    font-weight: 600;
-    padding: 0.25rem 0.5rem;
-    background-color: rgba(25, 135, 84, 0.1);
-    border-radius: 4px;
-}
-
-.games-table .result-loss {
-    color: #dc3545;
-    font-weight: 600;
-    padding: 0.25rem 0.5rem;
-    background-color: rgba(220, 53, 69, 0.1);
-    border-radius: 4px;
-}
-
-.games-table .result-unknown {
-    color: #6c757d;
-    font-weight: 600;
-    padding: 0.25rem 0.5rem;
-    background-color: rgba(108, 117, 125, 0.1);
-    border-radius: 4px;
-}
-
-/* Load More Button */
+/* Load More Button - page-specific functionality */
 #loadMoreGames {
     transition: all 0.2s ease;
 }
@@ -114,43 +16,11 @@
     opacity: 0.7;
 }
 
-/* Responsive Design */
+/* Responsive Design - only page-specific adjustments */
 @media (max-width: 768px) {
-    .stat-item h3 {
-        font-size: 1.5rem;
-    }
-    
-    .highlight-item {
-        padding: 0.5rem 0;
-    }
-    
-    .highlight-item .d-flex {
-        flex-direction: column;
-        align-items: flex-start !important;
-    }
-    
-    .highlight-item .character-container {
-        margin-bottom: 0.25rem;
-    }
+    /* Any page-specific responsive adjustments that components don't handle */
 }
 
 @media (max-width: 576px) {
-    .stat-item {
-        text-align: center;
-        padding: 0.75rem 0;
-    }
-    
-    .stat-item h3 {
-        font-size: 1.25rem;
-    }
-    
-    .games-table th,
-    .games-table td {
-        padding: 0.5rem 0.25rem;
-        font-size: 0.85rem;
-    }
-    
-    .games-table .game-time {
-        display: none;
-    }
+    /* Very small screen adjustments specific to this page layout */
 }

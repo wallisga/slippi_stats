@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{# Import navbar component #}
+{% from 'components/navbar/_navbar.html' import navbar %}
+
+{# Include components for asset loading #}
+{% include 'components/navbar/_navbar.html' %}
+
 {% block layout_css %}
 <!-- Component CSS for error pages -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/cards.css') }}">
@@ -52,17 +58,11 @@
 </style>
 {% endblock %}
 
-{% block nav_items %}
-<li class="nav-item">
-    <a class="nav-link" href="/players">Players</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="/download">Download</a>
-</li>
-{% endblock %}
-
-{% block nav_extras %}
-<!-- Minimal navbar for error pages - no search -->
+{% block navbar_config %}
+{# Configure navbar for error layout - minimal with no search #}
+{{ navbar("error", search_config={
+    'enabled': false
+}) }}
 {% endblock %}
 
 {% block content_wrapper %}

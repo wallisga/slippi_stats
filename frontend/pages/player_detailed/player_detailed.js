@@ -121,7 +121,7 @@ async function fetchPlayerData(filters = {}) {
     try {
         const playerTemplateData = getPlayerDataFromTemplate();
         const playerCode = playerTemplateData.playerCode;
-        const encodedPlayerCode = playerTemplateData.encodedPlayerCode; // ← Use pre-encoded value
+        const encodedPlayerCode = playerTemplateData.encodedPlayerCode;
         
         if (!playerCode) {
             throw new Error('No player code available');
@@ -201,8 +201,10 @@ async function fetchPlayerData(filters = {}) {
 
 // ✅ COMPONENT COORDINATION: Update UI using component APIs
 function updateUI(data) {
+    console.log('Updating UI with data:', data);
+    
     // Update overall stats
-    const overallWinRate = data.overall_winrate;
+    const overallWinRate = data.overall_winrate || 0;
     const overallWinRateCircle = document.getElementById('overall-win-rate-circle');
     const overallWinRateText = document.getElementById('overall-win-rate');
     const overallStats = document.getElementById('overall-stats');
@@ -211,7 +213,7 @@ function updateUI(data) {
     if (overallWinRateText) overallWinRateText.textContent = `${(overallWinRate * 100).toFixed(1)}%`;
     if (overallStats) {
         overallStats.innerHTML = `
-            <strong>${data.wins}</strong> wins out of <strong>${data.total_games}</strong> games
+            <strong>${data.wins || 0}</strong> wins out of <strong>${data.total_games || 0}</strong> games
         `;
     }
     
@@ -219,10 +221,29 @@ function updateUI(data) {
     updateFilterSummary(data);
     
     // ✅ COMPONENT INTERACTION: Update stats tables using component
+    // Debug: Check if tables exist before updating
+    console.log('Checking for table elements...');
+    console.log('character-stats-table:', document.getElementById('character-stats-table'));
+    console.log('opponent-stats-table:', document.getElementById('opponent-stats-table'));
+    console.log('matchup-stats-table:', document.getElementById('matchup-stats-table'));
+    
     if (window.TablesComponent) {
-        window.TablesComponent.updateStatsTable('character-stats-table', 'character-count', data.character_stats, true);
-        window.TablesComponent.updateStatsTable('opponent-stats-table', 'opponent-count', data.opponent_stats, false);
-        window.TablesComponent.updateStatsTable('matchup-stats-table', 'matchup-count', data.opponent_character_stats, true);
+        // Update character stats table
+        if (data.character_stats) {
+            window.TablesComponent.updateStatsTable('character-stats', 'character-count', data.character_stats, true);
+        }
+        
+        // Update opponent stats table
+        if (data.opponent_stats) {
+            window.TablesComponent.updateStatsTable('opponent-stats', 'opponent-count', data.opponent_stats, false);
+        }
+        
+        // Update matchup stats table
+        if (data.opponent_character_stats) {
+            window.TablesComponent.updateStatsTable('matchup-stats', 'matchup-count', data.opponent_character_stats, true);
+        }
+    } else {
+        console.warn('TablesComponent not available');
     }
     
     // ✅ COMPONENT INTERACTION: Update charts using component
@@ -243,9 +264,11 @@ function updateUI(data) {
     }
     
     // ✅ COMPONENT INTERACTION: Initialize character icons after updating tables
-    if (typeof initializeCharacterIcons === 'function') {
-        initializeCharacterIcons();
-    }
+    setTimeout(() => {
+        if (typeof initializeCharacterIcons === 'function') {
+            initializeCharacterIcons();
+        }
+    }, 100);
 }
 
 function updateFilterSummary(data) {
@@ -254,34 +277,36 @@ function updateFilterSummary(data) {
     const charactersPlayingAgainst = document.getElementById('charactersPlayingAgainst');
     const totalGamesCount = document.getElementById('totalGamesCount');
     
-    if (charactersPlayingAs) {
-        const charFilter = Array.isArray(data.applied_filters.character) ? 
-            data.applied_filters.character.join(', ') : 
-            data.applied_filters.character;
-        charactersPlayingAs.innerHTML = `
-            Playing as: <strong>${charFilter === 'all' ? 'All characters' : charFilter}</strong>
-        `;
+    if (data.applied_filters) {
+        if (charactersPlayingAs) {
+            const charFilter = Array.isArray(data.applied_filters.character) ? 
+                data.applied_filters.character.join(', ') : 
+                data.applied_filters.character;
+            charactersPlayingAs.innerHTML = `
+                Playing as: <strong>${charFilter === 'all' ? 'All characters' : charFilter}</strong>
+            `;
+        }
+        
+        if (opponentsPlayingAgainst) {
+            const oppFilter = Array.isArray(data.applied_filters.opponent) ? 
+                data.applied_filters.opponent.join(', ') : 
+                data.applied_filters.opponent;
+            opponentsPlayingAgainst.innerHTML = `
+                Playing against: <strong>${oppFilter === 'all' ? 'All opponents' : oppFilter}</strong>
+            `;
+        }
+        
+        if (charactersPlayingAgainst) {
+            const oppCharFilter = Array.isArray(data.applied_filters.opponent_character) ? 
+                data.applied_filters.opponent_character.join(', ') : 
+                data.applied_filters.opponent_character;
+            charactersPlayingAgainst.innerHTML = `
+                Opposing characters: <strong>${oppCharFilter === 'all' ? 'All characters' : oppCharFilter}</strong>
+            `;
+        }
     }
     
-    if (opponentsPlayingAgainst) {
-        const oppFilter = Array.isArray(data.applied_filters.opponent) ? 
-            data.applied_filters.opponent.join(', ') : 
-            data.applied_filters.opponent;
-        opponentsPlayingAgainst.innerHTML = `
-            Playing against: <strong>${oppFilter === 'all' ? 'All opponents' : oppFilter}</strong>
-        `;
-    }
-    
-    if (charactersPlayingAgainst) {
-        const oppCharFilter = Array.isArray(data.applied_filters.opponent_character) ? 
-            data.applied_filters.opponent_character.join(', ') : 
-            data.applied_filters.opponent_character;
-        charactersPlayingAgainst.innerHTML = `
-            Opposing characters: <strong>${oppCharFilter === 'all' ? 'All characters' : oppCharFilter}</strong>
-        `;
-    }
-    
-    if (totalGamesCount) totalGamesCount.textContent = data.total_games;
+    if (totalGamesCount) totalGamesCount.textContent = data.total_games || 0;
 }
 
 // Helper functions

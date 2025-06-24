@@ -2,28 +2,24 @@
 
 {# Import component macros - this makes them available #}
 {% from 'components/search/_search.html' import navbar_search, main_search, filter_search %}
+{% from 'components/navbar/_navbar.html' import navbar %}
+{% from 'components/cards/_cards.html' import hero_stats_card, action_card, recent_games_card, top_players_card, card %}
 
 {# Include components for asset loading #}
 {% include 'components/search/_search.html' %}
 {% include 'components/character_icons/_character_icons.html' %}
+{% include 'components/navbar/_navbar.html' %}
+{% include 'components/cards/_cards.html' %}
 
 {% block layout_css %}
 {# Component CSS is loaded by the included components above #}
 {% endblock %}
 
-{% block nav_items %}
-<li class="nav-item">
-    <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link {% if '/how-to' in request.path %}active{% endif %}" href="/how-to">How-To</a>
-</li>
-{% endblock %}
-
-{% block nav_extras %}
-{# Use search component macro #}
-{{ navbar_search(true) }}
+{% block navbar_config %}
+{# Configure navbar for simple layout #}
+{{ navbar("simple", search_config={
+    'enabled': true,
+    'placeholder': 'Search players...',
+    'autofocus': false
+}) }}
 {% endblock %}

@@ -1,7 +1,5 @@
 {% extends "layouts/simple.html" %}
 
-{# NO component imports - layout provides all components #}
-
 {% block title %}Slippi Stats - Homepage{% endblock %}
 
 {% block extra_css %}
@@ -15,59 +13,46 @@
         <h1 class="display-4 fw-bold mb-3">Slippi Stats</h1>
         <p class="lead mb-4">Track your Super Smash Bros. Melee performance and analyze your gameplay</p>
         
-        <!-- Getting Started Actions -->
-        <div class="getting-started-actions">
-            <div class="row justify-content-center">
-                <div class="col-lg-8">
-                    <div class="action-cards">
-                        <div class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-search"></i>
-                            </div>
-                            <h5>Find a Player</h5>
-                            <p>Use the search bar above to find any player's statistics and match history</p>
-                            <small class="text-muted">Try searching for a player tag like "EXO#196"</small>
-                        </div>
-                        
-                        <div class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-people"></i>
-                            </div>
-                            <h5>Browse All Players</h5>
-                            <p>Explore our complete player database with sorting and filtering options</p>
-                            <a href="/players" class="btn btn-primary btn-sm mt-2">
-                                <i class="bi bi-arrow-right me-1"></i>View Players
-                            </a>
-                        </div>
-                        
-                        <div class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-download"></i>
-                            </div>
-                            <h5>Start Tracking</h5>
-                            <p>Download our client to automatically track your games and build your profile</p>
-                            <a href="/download" class="btn btn-success btn-sm mt-2">
-                                <i class="bi bi-download me-1"></i>Get Started
-                            </a>
-                        </div>
-                    </div>
-                </div>
+        <!-- Hero Stats using card component -->
+        <div class="row justify-content-center mb-4">
+            <div class="col-lg-6 col-md-8">
+                {{ hero_stats_card(total_games, total_players) }}
             </div>
         </div>
         
-        <!-- Stats Overview -->
-        <div class="hero-stats mt-5">
+        <!-- Getting Started Actions using card components -->
+        <div class="getting-started-actions">
             <div class="row justify-content-center">
-                <div class="col-md-3 col-6">
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_games | default(0) }}</div>
-                        <div class="stat-label">Games Tracked</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6">
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_players | default(0) }}</div>
-                        <div class="stat-label">Players</div>
+                <div class="col-lg-10">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ action_card(
+                                "Add card here",
+                                "Use this as a way to show off features to the user. Next up will likely be a character layout and relevant pages.",
+                                "bi-search",
+                                hint="Read the GitHub docs in this repo to understand more..."
+                            ) }}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            {{ action_card(
+                                "Browse All Players",
+                                "Explore our complete player database with sorting and filtering options",
+                                "bi-people",
+                                "View Players",
+                                "/players"
+                            ) }}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            {{ action_card(
+                                "Start Tracking",
+                                "Download our client to automatically track your games and build your profile",
+                                "bi-download",
+                                "Get Started",
+                                "/download"
+                            ) }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -75,84 +60,25 @@
     </div>
 </div>
 
-<!-- Recent Games Section -->
+<!-- Recent Games Section using card component -->
 {% if recent_games %}
 <div class="section mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title">Recent Games</h2>
         <small class="text-muted">Live updates every few minutes</small>
     </div>
     
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Players</th>
-                            <th>Characters</th>
-                            <th>Result</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for game in recent_games[:10] %}
-                        <tr>
-                            <td>
-                                <a href="/player/{{ game.player1_tag_encoded }}" class="player-link">{{ game.player1 }}</a>
-                                <span class="text-muted">vs</span>
-                                <a href="/player/{{ game.player2_tag_encoded }}" class="player-link">{{ game.player2 }}</a>
-                            </td>
-                            <td>
-                                <span data-character-name="{{ game.character1 }}" class="character-container me-2"></span>{{ game.character1 }}
-                                <span class="text-muted mx-2">vs</span>
-                                <span data-character-name="{{ game.character2 }}" class="character-container me-2"></span>{{ game.character2 }}
-                            </td>
-                            <td>
-                                <span class="game-result">{{ game.result }}</span>
-                            </td>
-                            <td class="time-cell" data-time="{{ game.time }}">
-                                <small class="text-muted">{{ game.time }}</small>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+    {{ recent_games_card(recent_games, "Recent Games") }}
 </div>
 {% endif %}
 
-<!-- Top Players Section -->
+<!-- Top Players Section using card component -->
 {% if top_players %}
 <div class="section mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title">Top Players</h2>
         <a href="/players" class="btn btn-outline-primary btn-sm">View All Players</a>
     </div>
     
-    <div class="row">
-        {% for player in top_players[:6] %}
-        <div class="col-lg-4 col-md-6 mb-3">
-            <div class="card player-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title mb-0">
-                            <a href="/player/{{ player.code_encoded }}" class="player-link">{{ player.name }}</a>
-                        </h5>
-                        <span class="badge bg-primary">{{ (player.win_rate * 100) | round(1) }}%</span>
-                    </div>
-                    <div class="player-stats">
-                        <small class="text-muted">
-                            {{ player.games }} games • {{ player.wins }} wins
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
+    {{ top_players_card(top_players, "Top Players") }}
 </div>
 {% endif %}
 

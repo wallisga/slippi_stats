@@ -1,5 +1,5 @@
 // Base JavaScript functionality for all pages
-// Simplified - search is now handled by the unified search component
+// Navbar functionality has been moved to navbar component
 
 /**
  * Global error handling
@@ -74,6 +74,23 @@ window.SlippiUtils = {
             element.innerHTML = originalText;
             element.disabled = false;
         }
+    },
+    
+    /**
+     * Safe navigation with loading states
+     */
+    navigateWithLoading: function(url, element = null) {
+        if (element) {
+            const originalText = element.innerHTML;
+            this.showLoading(element, 'Loading...');
+            
+            // Reset after timeout in case navigation fails
+            setTimeout(() => {
+                this.hideLoading(element, originalText);
+            }, 3000);
+        }
+        
+        window.location.href = url;
     }
 };
 
@@ -81,22 +98,48 @@ window.SlippiUtils = {
  * Common initialization that runs on all pages
  */
 document.addEventListener('DOMContentLoaded', function() {
-    // Add loading states to navigation links
-    const navLinks = document.querySelectorAll('.nav-link, .btn');
-    navLinks.forEach(link => {
-        if (link.href && link.href !== '#') {
-            link.addEventListener('click', function() {
+    // Add loading states to buttons and links (excluding navbar which handles its own)
+    const buttons = document.querySelectorAll('.btn:not(.navbar .btn)');
+    const externalLinks = document.querySelectorAll('a[href]:not(.navbar a):not([href^="#"]):not([href^="javascript:"])');
+    
+    // Add loading states to buttons
+    buttons.forEach(button => {
+        if (button.getAttribute('type') === 'button' && button.onclick) {
+            const originalClick = button.onclick;
+            button.onclick = function(e) {
                 const originalText = this.innerHTML;
-                // Only show loading for external navigation
-                if (!this.classList.contains('dropdown-toggle')) {
+                window.SlippiUtils.showLoading(this);
+                
+                // Execute original click handler
+                const result = originalClick.call(this, e);
+                
+                // Reset after delay if still enabled
+                setTimeout(() => {
+                    if (!this.disabled) {
+                        window.SlippiUtils.hideLoading(this, originalText);
+                    }
+                }, 1000);
+                
+                return result;
+            };
+        }
+    });
+    
+    // Add loading states to external navigation links
+    externalLinks.forEach(link => {
+        if (link.href && !link.href.includes('#') && !link.classList.contains('no-loading')) {
+            link.addEventListener('click', function(e) {
+                const originalText = this.innerHTML;
+                
+                // Only show loading for links that will navigate away
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && this.target !== '_blank') {
                     setTimeout(() => {
-                        if (this.tagName === 'A') {
-                            window.SlippiUtils.showLoading(this, 'Loading...');
-                            // Reset after 3 seconds in case navigation fails
-                            setTimeout(() => {
-                                this.innerHTML = originalText;
-                            }, 3000);
-                        }
+                        window.SlippiUtils.showLoading(this, 'Loading...');
+                        
+                        // Reset after timeout in case navigation fails
+                        setTimeout(() => {
+                            this.innerHTML = originalText;
+                        }, 3000);
                     }, 100);
                 }
             });

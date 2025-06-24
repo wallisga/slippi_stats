@@ -6,7 +6,7 @@
 {% from 'components/tables/_tables.html' import recent_games_table, stats_table, detailed_stats_table %}
 {% from 'components/filters/_filters.html' import advanced_filters_card, filter_column %}
 {% from 'components/charts/_charts.html' import chart_card %}
-{% from 'components/player_dropdown/_player_dropdown.html' import player_dropdown %}
+{% from 'components/navbar/_navbar.html' import navbar %}
 
 {# Include components for asset loading #}
 {% include 'components/search/_search.html' %}
@@ -16,21 +16,21 @@
 {% include 'components/filters/_filters.html' %}
 {% include 'components/charts/_charts.html' %}
 {% include 'components/player_title/_player_title.html' %}
-{% include 'components/player_dropdown/_player_dropdown.html' %}
+{% include 'components/navbar/_navbar.html' %}
 
 {% block layout_css %}
 {# Component CSS is loaded by the included components above #}
 {% endblock %}
 
-{% block nav_items %}
-{{ player_dropdown(player_code if player_code is defined else None) }}
-<li class="nav-item">
-    <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
-</li>
-{% endblock %}
-
-{% block nav_extras %}
-{{ navbar_search(true, "Find Player...") }}
+{% block navbar_config %}
+{# Configure navbar for player layout - simplified without dropdown #}
+{{ navbar("player", 
+    search_config={
+        'enabled': true,
+        'placeholder': 'Find Player...',
+        'autofocus': false
+    }
+) }}
 {% endblock %}
 
 {% block content_wrapper %}

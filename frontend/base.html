@@ -19,32 +19,14 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    <!-- Navigation -->
+    <!-- Navigation - Now handled by navbar component -->
     {% block navigation %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">Slippi Stats</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    {% block nav_items %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/players' in request.path %}active{% endif %}" href="/players">Players</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if '/download' in request.path %}active{% endif %}" href="/download">Download</a>
-                    </li>
-                    {% endblock %}
-                </ul>
-                
-                {% block nav_extras %}
-                <!-- Search form or other nav elements -->
-                {% endblock %}
-            </div>
-        </div>
-    </nav>
+    {# Default navbar configuration - layouts can override #}
+    {% block navbar_config %}
+    {# This block allows layouts to set navbar state and configuration #}
+    {% include 'components/navbar/_navbar.html' %}
+    {{ navbar("default") }}
+    {% endblock %}
     {% endblock %}
     
     <!-- Main Content -->
@@ -71,7 +53,6 @@
     
     <!-- Base JavaScript -->
     <script src="{{ url_for('static', filename='base.js') }}"></script>
-
     
     <!-- Layout-specific JavaScript -->
     {% block layout_js %}{% endblock %}
