@@ -26,10 +26,10 @@ utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
 ```
 
 ### Import Rules (Strictly Enforced)
-- ✅ **Services** can import: `database`, `utils`, `config`
-- ✅ **Utils** can import: `config` only
-- ✅ **Database** can import: `config` only
-- ✅ **App** can import: all modules
+- ✅ **Services** can import: `backend.database`, `backend.utils`, `backend.config`
+- ✅ **Utils** can import: `backend.config` only
+- ✅ **Database** can import: `backend.config` only
+- ✅ **App** can import: all backend modules (with `backend.` prefix)
 - ❌ **No circular imports** between services
 - ❌ **Database cannot import** services or utils
 - ❌ **Utils cannot import** database or services
@@ -268,7 +268,7 @@ HTTP Request → app.py Route → Service Layer → Utils + Database → Respons
 
 #### Web Pages (Template Rendering)
 ```python
-# In web_service.py
+# In backend/web_service.py
 def prepare_homepage_data():
     raw_games = database.get_games_recent(10)     # Raw data access
     recent_games = utils.process_recent_games_data(raw_games)  # Processing
@@ -284,7 +284,7 @@ def homepage():
 
 #### API Endpoints (JSON Responses)
 ```python
-# In api_service.py
+# In backend/api_service.py
 def process_detailed_player_data(player_code, filters):
     raw_games = database.get_games_all()         # Raw data access
     player_games = utils.process_raw_games_for_player(raw_games, player_code)

@@ -12,6 +12,7 @@ import secrets
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from backend.config import get_config
+from backend.sql import get_sql
 
 # Get configuration
 config = get_config()
@@ -550,31 +551,30 @@ def validate_api_key(api_key):
 # =============================================================================
 
 def get_database_stats():
-    """Get basic database statistics - simple counts only."""
+    """Get basic database statistics - Phase 1: Using externalized SQL for unique_players."""
     try:
-        # Get simple counts
+        # Get simple counts (keep existing approach for now)
         total_clients = get_clients_count()
         total_games = get_games_count()
         total_api_keys = get_api_keys_count()
         
-        # Get latest upload date
+        # Get latest upload date (keep existing approach)
         latest_upload_result = db_manager.execute_query(
             "SELECT upload_date FROM games ORDER BY upload_date DESC LIMIT 1",
             fetch_one=True
         )
         last_upload = latest_upload_result['upload_date'] if latest_upload_result else None
         
-        # Get unique players count (minimal processing)
-        unique_players_result = db_manager.execute_query("""
-            WITH player_tags AS (
-                SELECT DISTINCT json_extract(p.value, '$.player_tag') as tag
-                FROM games, json_each(games.player_data) as p
-                WHERE json_extract(p.value, '$.player_tag') IS NOT NULL
-                  AND json_extract(p.value, '$.player_tag') != ''
-            )
-            SELECT COUNT(*) as count FROM player_tags
-        """, fetch_one=True)
+        # NEW: Use externalized SQL for unique players count
+        unique_players_sql = get_sql('stats.unique_players')
+        unique_players_result = db_manager.execute_query(
+            unique_players_sql, 
+            params=None,  # No parameters needed
+            fetch_one=True
+        )
         unique_players = unique_players_result['count'] if unique_players_result else 0
+        
+        logger.debug(f"Database stats - Games: {total_games}, Players: {unique_players}")
         
         return {
             'total_clients': total_clients,

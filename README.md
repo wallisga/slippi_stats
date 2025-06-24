@@ -61,13 +61,13 @@ slippi_stats/
 ├── requirements.txt             # Python dependencies
 ├── start_dev.bat               # Windows development script
 ├── app.py                      # Flask application entry point
-├── config.py                   # Configuration management
-├── database.py                 # Data access layer
-├── web_service.py              # Web page business logic
-├── api_service.py              # API business logic
-├── utils.py                    # Shared utilities
-├── backend/                    # Backend documentation and future expansion
-│   └── README.md              # Backend architecture details
+├── backend/                    # Backend modules
+│   ├── README.md              # Backend architecture details
+│   ├── config.py              # Configuration management
+│   ├── database.py            # Data access layer
+│   ├── web_service.py         # Web page business logic
+│   ├── api_service.py         # API business logic
+│   └── utils.py               # Shared utilities
 └── frontend/                  # Component-based frontend
     ├── README.md              # Frontend architecture details
     ├── base.html              # Foundation template

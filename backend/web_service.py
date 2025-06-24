@@ -224,45 +224,15 @@ def prepare_standard_player_template_data(player_code, encoded_player_code):
     }
 
 def prepare_homepage_data():
-    """Get all data needed for the homepage."""
-    try:
-        # Get database stats directly
-        stats = get_database_stats()
-        app_stats = {
-            'total_games': stats.get('total_games', 0),
-            'total_players': stats.get('unique_players', 0),
-            'latest_game_date': stats.get('last_upload'),
-            'stats_generated_at': datetime.now().isoformat()
-        }
-        
-        recent_games = get_recent_games(10)
-        top_players = get_top_players(6)
-        
-        # Debug logging
-        logger.debug(f"Homepage data - Games: {app_stats['total_games']}, Players: {app_stats['total_players']}")
-        logger.debug(f"Recent games count: {len(recent_games)}")
-        logger.debug(f"Top players count: {len(top_players)}")
-        
-        # Debug first few top players
-        for i, player in enumerate(top_players[:3]):
-            logger.debug(f"Top player {i+1}: {player.get('name', 'NO_NAME')} - Win rate: {player.get('win_rate', 'NO_RATE')} ({type(player.get('win_rate', 'NO_TYPE'))})")
-        
-        return {
-            'app_stats': app_stats,
-            'total_games': app_stats.get('total_games', 0),
-            'total_players': app_stats.get('total_players', 0),
-            'recent_games': recent_games,
-            'top_players': top_players
-        }
-    except Exception as e:
-        logger.error(f"Error getting homepage data: {str(e)}")
-        return {
-            'app_stats': {},
-            'total_games': 0,
-            'total_players': 0,
-            'recent_games': [],
-            'top_players': []
-        }
+    stats = get_database_stats()
+    
+    # No more renaming or duplication needed!
+    return {
+        'total_games': stats.get('total_games', 0),      # Direct pass-through
+        'total_players': stats.get('unique_players', 0),  # Direct pass-through
+        'recent_games': get_recent_games(10),
+        'top_players': get_top_players(6)
+    }
 
 def prepare_all_players_data():
     """Get all players data for the players index page."""
