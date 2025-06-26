@@ -29,6 +29,7 @@ from functools import wraps
 # =============================================================================
 
 from flask import Flask, render_template, request, jsonify, abort, redirect, send_from_directory
+from werkzeug.exceptions import RequestEntityTooLarge
 
 # =============================================================================
 # App Modules
@@ -49,6 +50,7 @@ app = Flask(__name__,
             template_folder='frontend',    # Templates now in frontend/
             static_folder='frontend')      # Static assets now in frontend/
 app.config.update({'SECRET_KEY': config.SECRET_KEY, 'DEBUG': config.DEBUG})
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 logger = config.init_logging()
 config.validate_config()
 
@@ -182,15 +184,6 @@ def api_clients_register():
     result = api_service.process_client_registration(client_data, registration_key)
     return jsonify(result)
 
-@app.route('/api/games/upload', methods=['POST'])
-@require_api_key
-@rate_limited(config.RATE_LIMIT_UPLOADS)
-def api_games_upload(client_id):
-    """Upload games data."""
-    upload_data = request.json
-    result = api_service.process_games_upload(client_id, upload_data)
-    return jsonify(result)
-
 @app.route('/api/stats', methods=['GET'])
 def api_server_stats():
     """Get server statistics."""
@@ -199,6 +192,140 @@ def api_server_stats():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/files/upload', methods=['POST'])
+@require_api_key
+@rate_limited(config.RATE_LIMIT_UPLOADS)
+def api_files_upload(client_id):
+    """
+    Upload files with metadata.
+    Expects JSON payload with files data including base64 encoded content.
+    """
+    try:
+        upload_data = request.json
+        if not upload_data:
+            abort(400, description="No upload data provided")
+        
+        result = api_service.process_combined_upload(client_id, upload_data)
+        return jsonify(result)
+        
+    except RequestEntityTooLarge:
+        abort(413, description="File too large")
+    except ValueError as e:
+        abort(400, description=str(e))
+    except Exception as e:
+        logger.error(f"Error in file upload API: {str(e)}")
+        abort(500, description=f"Server error: {str(e)}")
+
+@app.route('/api/files', methods=['GET'])
+@require_api_key
+@rate_limited(60)  # 60 requests per minute for file listing
+def api_files_list(client_id):
+    """List files uploaded by the client."""
+    try:
+        limit = min(100, int(request.args.get('limit', '50')))  # Max 100 files per request
+        
+        from backend.database import get_files_by_client
+        files = get_files_by_client(client_id, limit=limit)
+        
+        # Convert to JSON-serializable format
+        files_data = []
+        for file_record in files:
+            files_data.append({
+                'file_id': file_record['file_id'],
+                'file_hash': file_record['file_hash'],
+                'original_filename': file_record['original_filename'],
+                'file_size': file_record['file_size'],
+                'upload_date': file_record['upload_date'],
+                'metadata': json.loads(file_record['metadata']) if file_record['metadata'] else {}
+            })
+        
+        return jsonify({
+            'files': files_data,
+            'count': len(files_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing files for client {client_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/files/<file_id>', methods=['GET'])
+@require_api_key
+@rate_limited(30)  # 30 requests per minute for file details
+def api_file_details(file_id, client_id):
+    """Get details about a specific file."""
+    try:
+        from backend.database import get_file_by_id
+        file_record = get_file_by_id(file_id)
+        
+        if not file_record:
+            abort(404, description="File not found")
+        
+        # Check if client owns this file
+        if file_record['client_id'] != client_id:
+            abort(403, description="Access denied")
+        
+        file_data = {
+            'file_id': file_record['file_id'],
+            'file_hash': file_record['file_hash'],
+            'original_filename': file_record['original_filename'],
+            'file_size': file_record['file_size'],
+            'upload_date': file_record['upload_date'],
+            'metadata': json.loads(file_record['metadata']) if file_record['metadata'] else {}
+        }
+        
+        return jsonify(file_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting file details for {file_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/files/stats', methods=['GET'])
+def api_admin_file_stats():
+    """Get file storage statistics (admin endpoint)."""
+    try:
+        # You might want to add admin authentication here
+        from backend.database import get_enhanced_database_stats
+        stats = get_enhanced_database_stats()
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting file stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Enhanced games upload endpoint (backward compatible)
+@app.route('/api/games/upload', methods=['POST'])
+@require_api_key
+@rate_limited(config.RATE_LIMIT_UPLOADS)
+def api_games_upload(client_id):
+    """
+    Games upload endpoint that supports both legacy format and new combined format.
+    
+    Legacy format: {"client_id": "...", "games": [...]}
+    New format: {"client_id": "...", "games": [...], "files": [...]}
+    """
+    try:
+        upload_data = request.json
+        if not upload_data:
+            abort(400, description="No upload data provided")
+        
+        # Check if this is the new combined format (has files) or legacy format
+        if 'files' in upload_data and upload_data['files']:
+            # New combined format
+            result = api_service.process_combined_upload(client_id, upload_data)
+        else:
+            # Legacy format - just process games
+            result = api_service.process_games_upload(client_id, upload_data)
+        
+        return jsonify(result)
+        
+    except RequestEntityTooLarge:
+        abort(413, description="Upload too large")
+    except ValueError as e:
+        abort(400, description=str(e))
+    except Exception as e:
+        logger.error(f"Error in enhanced games upload API: {str(e)}")
+        abort(500, description=f"Server error: {str(e)}")        
 
 # =============================================================================
 # Static File Routes
@@ -246,6 +373,11 @@ def forbidden(error):
 def page_not_found(error):
     template_data = get_error_template_data(404, str(error.description))
     return render_template('pages/error_status/error_status.html', **template_data), 404
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    template_data = get_error_template_data(413, str(error.description))
+    return render_template('pages/error_status/error_status.html', **template_data), 413
 
 @app.errorhandler(429)
 def too_many_requests(error):

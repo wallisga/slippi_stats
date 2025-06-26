@@ -9,6 +9,7 @@ import sqlite3
 import json
 import logging
 import secrets
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from backend.config import get_config
@@ -80,6 +81,21 @@ class DatabaseManager:
                 FOREIGN KEY (client_id) REFERENCES clients (client_id)
             )
             ''')
+
+            # Create files table
+            c.execute('''
+            CREATE TABLE IF NOT EXISTS files (
+                file_id TEXT PRIMARY KEY,
+                file_hash TEXT UNIQUE NOT NULL,
+                client_id TEXT NOT NULL,
+                original_filename TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                upload_date TEXT NOT NULL,
+                metadata TEXT,
+                FOREIGN KEY (client_id) REFERENCES clients (client_id)
+            )
+            ''')            
             
             # Create indexes for better performance
             self._create_indexes(c)
@@ -102,7 +118,12 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_games_client_id ON games (client_id)",
             "CREATE INDEX IF NOT EXISTS idx_games_upload_date ON games (upload_date)",
             f"CREATE INDEX IF NOT EXISTS idx_api_keys_key ON {config.API_KEYS_TABLE} (api_key)",
-            "CREATE INDEX IF NOT EXISTS idx_clients_last_active ON clients (last_active)"
+            "CREATE INDEX IF NOT EXISTS idx_clients_last_active ON clients (last_active)",
+            # New file indexes
+            "CREATE INDEX IF NOT EXISTS idx_files_hash ON files (file_hash)",
+            "CREATE INDEX IF NOT EXISTS idx_files_client_id ON files (client_id)",
+            "CREATE INDEX IF NOT EXISTS idx_files_upload_date ON files (upload_date)",
+            "CREATE INDEX IF NOT EXISTS idx_files_original_filename ON files (original_filename)"
         ]
         
         for index_sql in indexes:
@@ -516,6 +537,200 @@ def get_api_keys_count():
 
 
 # =============================================================================
+# Files Table Operations (Raw Data Access Only)
+# =============================================================================
+
+def get_files_all(limit=None, order_by='upload_date DESC'):
+    """
+    Get all files from the database with optional limit and ordering.
+    Returns raw file records - no processing.
+    """
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = "SELECT file_id, file_hash, client_id, original_filename, file_path, file_size, upload_date, metadata FROM files"
+            if order_by:
+                query += f" ORDER BY {order_by}"
+            if limit:
+                query += f" LIMIT {limit}"
+            
+            cursor.execute(query)
+            return cursor.fetchall()
+            
+    except Exception as e:
+        logger.error(f"Error getting all files: {str(e)}")
+        return []
+
+def get_files_by_client(client_id, limit=None):
+    """Get files uploaded by a specific client."""
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = """
+                SELECT file_id, file_hash, client_id, original_filename, file_path, file_size, upload_date, metadata
+                FROM files 
+                WHERE client_id = ?
+                ORDER BY upload_date DESC
+            """
+            
+            if limit:
+                query += f" LIMIT {limit}"
+            
+            cursor.execute(query, (client_id,))
+            return cursor.fetchall()
+            
+    except Exception as e:
+        logger.error(f"Error getting files for client {client_id}: {str(e)}")
+        return []
+
+def get_file_by_hash(file_hash):
+    """Get a file record by its hash."""
+    try:
+        return db_manager.execute_query(
+            "SELECT * FROM files WHERE file_hash = ?",
+            (file_hash,),
+            fetch_one=True
+        )
+    except Exception as e:
+        logger.error(f"Error getting file by hash {file_hash}: {str(e)}")
+        return None
+
+def get_file_by_id(file_id):
+    """Get a file record by its ID."""
+    try:
+        return db_manager.execute_query(
+            "SELECT * FROM files WHERE file_id = ?",
+            (file_id,),
+            fetch_one=True
+        )
+    except Exception as e:
+        logger.error(f"Error getting file by ID {file_id}: {str(e)}")
+        return None
+
+def create_file_record(file_data):
+    """
+    Insert a new file record into the files table.
+    
+    Args:
+        file_data (dict): File data with keys: file_hash, client_id, original_filename,
+                         file_path, file_size, upload_date, metadata
+    
+    Returns:
+        str: Generated file_id
+    """
+    try:
+        file_id = str(uuid.uuid4())
+        
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO files (file_id, file_hash, client_id, original_filename, file_path, file_size, upload_date, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                file_id,
+                file_data['file_hash'],
+                file_data['client_id'],
+                file_data['original_filename'],
+                file_data['file_path'],
+                file_data['file_size'],
+                file_data['upload_date'],
+                file_data.get('metadata', '{}')
+            ))
+            conn.commit()
+            return file_id
+            
+    except Exception as e:
+        logger.error(f"Error creating file record: {str(e)}")
+        raise
+
+def check_file_exists_by_hash(file_hash):
+    """Check if a file with the given hash exists."""
+    try:
+        result = db_manager.execute_query(
+            "SELECT 1 FROM files WHERE file_hash = ?",
+            (file_hash,),
+            fetch_one=True
+        )
+        return result is not None
+    except Exception as e:
+        logger.error(f"Error checking if file exists {file_hash}: {str(e)}")
+        return False
+
+def get_files_count():
+    """Get total count of files in database."""
+    try:
+        result = db_manager.execute_query("SELECT COUNT(*) as count FROM files", fetch_one=True)
+        return result['count'] if result else 0
+    except Exception as e:
+        logger.error(f"Error getting files count: {str(e)}")
+        return 0
+
+def get_files_stats():
+    """Get file storage statistics."""
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get total files and total size
+            cursor.execute("SELECT COUNT(*) as count, SUM(file_size) as total_size FROM files")
+            result = cursor.fetchone()
+            
+            total_files = result['count'] if result else 0
+            total_size = result['total_size'] if result and result['total_size'] else 0
+            
+            # Get files by client
+            cursor.execute("""
+                SELECT client_id, COUNT(*) as file_count, SUM(file_size) as client_size
+                FROM files 
+                GROUP BY client_id 
+                ORDER BY file_count DESC
+            """)
+            by_client = cursor.fetchall()
+            
+            return {
+                'total_files': total_files,
+                'total_size_bytes': total_size,
+                'total_size_mb': round(total_size / (1024 * 1024), 2),
+                'files_by_client': [dict(row) for row in by_client]
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting file stats: {str(e)}")
+        return {
+            'total_files': 0,
+            'total_size_bytes': 0,
+            'total_size_mb': 0,
+            'files_by_client': []
+        }
+
+def delete_file_record(file_id):
+    """Delete a file record (does not delete the actual file)."""
+    try:
+        return db_manager.execute_query(
+            "DELETE FROM files WHERE file_id = ?",
+            (file_id,),
+            fetch_all=False
+        )
+    except Exception as e:
+        logger.error(f"Error deleting file record {file_id}: {str(e)}")
+        raise
+
+def update_file_metadata(file_id, metadata):
+    """Update metadata for a file record."""
+    try:
+        metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else metadata
+        return db_manager.execute_query(
+            "UPDATE files SET metadata = ? WHERE file_id = ?",
+            (metadata_json, file_id),
+            fetch_all=False
+        )
+    except Exception as e:
+        logger.error(f"Error updating file metadata for {file_id}: {str(e)}")
+        raise
+
+# =============================================================================
 # Simple Validation Functions (Minimal Business Logic)
 # =============================================================================
 
@@ -546,7 +761,7 @@ def validate_api_key(api_key):
 
 
 # =============================================================================
-# Database Statistics (Simple Aggregation Only)
+# Database Statistics
 # =============================================================================
 
 def get_database_stats():
@@ -594,3 +809,36 @@ def get_database_stats():
             'last_upload': None,
             'error': str(e)
         }
+
+def get_enhanced_database_stats():
+    """Get enhanced database statistics including file information."""
+    try:
+        # Get existing stats
+        basic_stats = get_database_stats()
+        
+        # Get file stats
+        file_stats = get_files_stats()
+        
+        # Combine them
+        enhanced_stats = basic_stats.copy()
+        enhanced_stats.update({
+            'total_files': file_stats['total_files'],
+            'total_file_size_bytes': file_stats['total_size_bytes'],
+            'total_file_size_mb': file_stats['total_size_mb'],
+            'files_by_client': file_stats['files_by_client']
+        })
+        
+        return enhanced_stats
+        
+    except Exception as e:
+        logger.error(f"Error getting enhanced database stats: {str(e)}")
+        # Return basic stats if file stats fail
+        basic_stats = get_database_stats()
+        basic_stats.update({
+            'total_files': 0,
+            'total_file_size_bytes': 0, 
+            'total_file_size_mb': 0,
+            'files_by_client': [],
+            'file_stats_error': str(e)
+        })
+        return basic_stats        

@@ -1,26 +1,213 @@
 """
-API Service Layer for Slippi Server.
+API Service Layer for Slippi Server with file upload support.
 
-This module contains business logic functions specifically for API endpoints.
-Functions here prepare data for JSON responses and handle API-specific concerns.
+This module adds file upload capabilities while maintaining existing functionality.
 """
 
+import os
+import hashlib
+import json
+from datetime import datetime
+from werkzeug.utils import secure_filename
 from backend.config import get_config
 from backend.utils import decode_player_tag, process_raw_games_for_player
 from backend.database import (
     get_database_stats, create_client_record, update_clients_info,
     create_api_key_record, update_api_key_record, check_client_exists,
     create_game_record, check_game_exists, validate_api_key, get_games_all,
-    update_clients_last_active
+    update_clients_last_active, create_file_record, get_file_by_hash
 )
 
 # Get configuration and logger
 config = get_config()
 logger = config.init_logging()
 
-# =============================================================================
-# Helper Functions (Duplicated from web_service to avoid circular imports)
-# =============================================================================
+# File upload settings
+ALLOWED_EXTENSIONS = {'.slp'}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max file size
+
+def allowed_file(filename):
+    """Check if file extension is allowed."""
+    return os.path.splitext(filename.lower())[1] in ALLOWED_EXTENSIONS
+
+def calculate_file_hash(file_content):
+    """Calculate SHA-256 hash of file content."""
+    return hashlib.sha256(file_content).hexdigest()
+
+def save_uploaded_file(file_content, filename, client_id, file_hash):
+    """Save uploaded file to disk with organized directory structure."""
+    try:
+        # Create directory structure: uploads/client_id/YYYY/MM/
+        upload_date = datetime.now()
+        year_month_dir = os.path.join(
+            config.get_uploads_dir(),
+            client_id,
+            upload_date.strftime('%Y'),
+            upload_date.strftime('%m')
+        )
+        os.makedirs(year_month_dir, exist_ok=True)
+        
+        # Use hash as filename to avoid duplicates and ensure uniqueness
+        safe_filename = f"{file_hash}.slp"
+        file_path = os.path.join(year_month_dir, safe_filename)
+        
+        # Write file to disk
+        with open(file_path, 'wb') as f:
+            f.write(file_content)
+        
+        logger.info(f"Saved file {filename} as {file_path}")
+        return file_path
+        
+    except Exception as e:
+        logger.error(f"Error saving uploaded file {filename}: {str(e)}")
+        raise
+
+def process_file_upload(client_id, file_data, metadata):
+    """
+    Process a file upload with metadata.
+    
+    Args:
+        client_id (str): Client ID from API key validation
+        file_data (bytes): Raw file content
+        metadata (dict): File metadata including original filename, game data, etc.
+    
+    Returns:
+        dict: Upload result with file info and processing status
+    """
+    try:
+        original_filename = metadata.get('filename', 'unknown.slp')
+        
+        # Validate file
+        if not allowed_file(original_filename):
+            raise ValueError(f"File type not allowed: {original_filename}")
+        
+        if len(file_data) > MAX_FILE_SIZE:
+            raise ValueError(f"File too large: {len(file_data)} bytes (max: {MAX_FILE_SIZE})")
+        
+        if len(file_data) == 0:
+            raise ValueError("Empty file")
+        
+        # Calculate file hash
+        file_hash = calculate_file_hash(file_data)
+        
+        # Check if file already exists
+        existing_file = get_file_by_hash(file_hash)
+        if existing_file:
+            logger.info(f"File with hash {file_hash} already exists")
+            return {
+                'success': True,
+                'message': 'File already exists',
+                'file_hash': file_hash,
+                'duplicate': True,
+                'existing_file_id': existing_file['file_id']
+            }
+        
+        # Save file to disk
+        file_path = save_uploaded_file(file_data, original_filename, client_id, file_hash)
+        
+        # Create file record in database
+        file_record = {
+            'file_hash': file_hash,
+            'client_id': client_id,
+            'original_filename': original_filename,
+            'file_path': file_path,
+            'file_size': len(file_data),
+            'upload_date': datetime.now().isoformat(),
+            'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata
+        }
+        
+        file_id = create_file_record(file_record)
+        
+        # Update client last active
+        update_clients_last_active(client_id)
+        
+        logger.info(f"Successfully processed file upload: {original_filename} ({file_hash})")
+        
+        return {
+            'success': True,
+            'message': 'File uploaded successfully',
+            'file_id': file_id,
+            'file_hash': file_hash,
+            'file_path': file_path,
+            'duplicate': False
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing file upload: {str(e)}")
+        raise
+
+def process_combined_upload(client_id, upload_data):
+    """
+    Process combined game data and file upload.
+    
+    Args:
+        client_id (str): Client ID from API key validation
+        upload_data (dict): Contains both games data and file information
+    
+    Returns:
+        dict: Combined upload result
+    """
+    try:
+        games_data = upload_data.get('games', [])
+        files_data = upload_data.get('files', [])
+        
+        # Process games data (existing functionality)
+        games_result = upload_games_for_client(client_id, games_data) if games_data else {
+            'uploaded': 0, 'duplicates': 0
+        }
+        
+        # Process file uploads
+        files_result = {'uploaded': 0, 'duplicates': 0, 'errors': 0}
+        file_details = []
+        
+        for file_info in files_data:
+            try:
+                file_content = file_info.get('content')  # Base64 encoded content
+                metadata = file_info.get('metadata', {})
+                
+                if not file_content:
+                    logger.warning("File upload missing content")
+                    files_result['errors'] += 1
+                    continue
+                
+                # Decode base64 content
+                import base64
+                file_bytes = base64.b64decode(file_content)
+                
+                # Process the file upload
+                result = process_file_upload(client_id, file_bytes, metadata)
+                
+                if result['duplicate']:
+                    files_result['duplicates'] += 1
+                else:
+                    files_result['uploaded'] += 1
+                
+                file_details.append({
+                    'filename': metadata.get('filename', 'unknown'),
+                    'hash': result['file_hash'],
+                    'status': 'duplicate' if result['duplicate'] else 'uploaded'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing individual file: {str(e)}")
+                files_result['errors'] += 1
+                file_details.append({
+                    'filename': file_info.get('metadata', {}).get('filename', 'unknown'),
+                    'status': 'error',
+                    'error': str(e)
+                })
+        
+        return {
+            'success': True,
+            'message': f"Processed {games_result['uploaded']} games and {files_result['uploaded']} files",
+            'games': games_result,
+            'files': files_result,
+            'file_details': file_details
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing combined upload: {str(e)}")
+        raise
 
 def get_player_games(player_code):
     """Get all games for a specific player."""
@@ -411,3 +598,60 @@ def process_games_upload(client_id, upload_data):
         return result
     except Exception as e:
         abort(500, description=f"Server error: {str(e)}")
+
+# The existing upload_games_for_client function remains exactly the same
+def upload_games_for_client(client_id, games_data):
+    """Process and upload games for a specific client."""
+    try:
+        if not games_data:
+            return {'success': True, 'message': 'No games to upload', 'uploaded': 0, 'duplicates': 0}
+        
+        # Update client last active
+        update_clients_last_active(client_id)
+        
+        uploaded_count = 0
+        duplicate_count = 0
+        
+        for game_data in games_data:
+            game_id = game_data.get('game_id')
+            if not game_id:
+                logger.warning("Game missing game_id, skipping")
+                continue
+            
+            # Check if game already exists
+            if check_game_exists(game_id):
+                duplicate_count += 1
+                continue
+            
+            # Prepare game record
+            game_record = {
+                'game_id': game_id,
+                'client_id': client_id,
+                'start_time': game_data.get('start_time', ''),
+                'last_frame': game_data.get('last_frame', 0),
+                'stage_id': game_data.get('stage_id', 0),
+                'player_data': game_data.get('player_data', '[]'),
+                'game_type': game_data.get('game_type', 'unknown')
+            }
+            
+            # Ensure player_data is a JSON string
+            if isinstance(game_record['player_data'], (list, dict)):
+                import json
+                game_record['player_data'] = json.dumps(game_record['player_data'])
+            
+            # Create game record
+            create_game_record(game_record)
+            uploaded_count += 1
+        
+        logger.info(f"Client {client_id} uploaded {uploaded_count} games ({duplicate_count} duplicates)")
+        
+        return {
+            'success': True,
+            'message': f'Uploaded {uploaded_count} games',
+            'uploaded': uploaded_count,
+            'duplicates': duplicate_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error uploading games for client {client_id}: {str(e)}")
+        raise
