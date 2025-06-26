@@ -4,15 +4,16 @@ This document provides detailed information about the Slippi Stats Server backen
 
 ## Architecture Overview
 
-The backend follows a **service-oriented architecture** with clear separation of concerns. Each module has specific responsibilities and follows strict import rules to maintain clean dependencies.
+The backend follows a **service-oriented architecture** with clear separation of concerns and **external SQL file management**. Each module has specific responsibilities and follows strict import rules to maintain clean dependencies.
 
-### Core Principle: "Services Process, Database Stores, Utils Help"
+### Core Principle: "Services Process, Database Stores, Utils Help, SQL Separates"
 
 - **Services**: Business logic and request processing (web_service.py, api_service.py)
-- **Database**: Pure data access with no business logic (database.py)
+- **Database**: Pure data access with external SQL files (database.py + sql/ directory)
 - **Utils**: Shared helper functions and data processing (utils.py)
 - **Config**: Centralized configuration management (config.py)
 - **App**: Flask setup and HTTP routing (app.py)
+- **SQL**: External .sql files organized by functionality (sql/ directory)
 
 ## Module Structure & Responsibilities
 
@@ -22,13 +23,15 @@ app.py (Flask routes & HTTP handling)        # Top level
     ↓ can import
 web_service.py + api_service.py              # Business logic layers
     ↓ can import  
-utils.py (shared helpers) + database.py (data access) + config.py  # Foundation
+utils.py + database.py + config.py           # Foundation
+    ↓ uses
+sql/ directory (external SQL files)          # Data queries
 ```
 
 ### Import Rules (Strictly Enforced)
 - ✅ **Services** can import: `backend.database`, `backend.utils`, `backend.config`
 - ✅ **Utils** can import: `backend.config` only
-- ✅ **Database** can import: `backend.config` only
+- ✅ **Database** can import: `backend.config`, `backend.sql_manager` only
 - ✅ **App** can import: all backend modules (with `backend.` prefix)
 - ❌ **No circular imports** between services
 - ❌ **Database cannot import** services or utils
@@ -58,52 +61,94 @@ get_database_path()             # Database file location
 get_downloads_dir()             # Downloads directory path
 ```
 
-### database.py - Pure Data Access Layer ✅ COMPLETE  
-**Purpose**: Raw database operations ONLY - no business logic
+### sql_manager.py - Dynamic SQL Query Management ✅ NEW
+**Purpose**: Load and manage SQL queries from external .sql files
+
+**Contains:**
+- Dynamic discovery of SQL files in sql/ directory structure
+- Template variable substitution for dynamic queries
+- Query caching and reloading capabilities
+- Category-based organization of SQL operations
+
+**Import Rules**: Can import `backend.config` only
+**Status**: New module for SQL file management
+
+**Key Features:**
+- **Automatic Discovery**: Add any .sql file to sql/category/ and it becomes available
+- **Template Support**: Use `{variable}` placeholders for dynamic values
+- **Category Organization**: Organize queries by functionality (games, clients, files, etc.)
+- **Hot Reloading**: Reload SQL files during development without restart
+
+**Key Functions:**
+```python
+load_queries()                  # Discover and load all SQL files
+get_query(category, name)       # Get a specific SQL query
+format_query(cat, name, **vars) # Get query with template substitution
+has_query(category, name)       # Check if query exists
+list_available_queries()        # List all available queries
+reload_queries()                # Reload from files (development)
+```
+
+**Directory Structure:**
+```
+backend/sql/
+├── schema/          # Table creation and indexing
+├── games/           # Games table operations
+├── clients/         # Client management queries
+├── api_keys/        # API key operations
+├── files/           # File storage queries
+└── stats/           # Statistics and reporting
+```
+
+### database.py - Pure Data Access Layer ✅ REFACTORED
+**Purpose**: Raw database operations ONLY - now uses external SQL files
 
 **Contains:**
 - Database connection management (`DatabaseManager` class)
-- Table-specific CRUD operations
-- Raw SQL queries and data retrieval
-- Database initialization (`init_db()`)
+- Table-specific CRUD operations using external SQL
+- Raw SQL query execution with template support
+- Database initialization from SQL files
 
-**Import Rules**: Can import `config` only
-**Status**: Complete refactoring - pure data access, no business logic
+**Import Rules**: Can import `config` and `sql_manager` only
+**Status**: Refactored to use external SQL files - maintains same API
+
+**Key Changes:**
+- All SQL statements moved to external .sql files
+- Dynamic query loading from sql/ directory
+- Template variable support for configurable queries
+- Maintains backward compatibility with existing functions
 
 **Key Functions (Table-Organized):**
 ```python
 # Database Management
-init_db()                       # Initialize database schema
+init_db()                       # Initialize database schema from SQL files
 DatabaseManager.get_connection() # Context manager for connections
 
-# Games Table
-get_games_all(limit, order_by)  # Get all games with optional limit/ordering
-get_games_recent(limit)         # Get recent games by start_time
-get_games_by_date_range()       # Get games within date range
-create_game_record(game_data)   # Insert new game record
-check_game_exists(game_id)      # Check if game exists
-get_games_count()               # Total games count
+# Games Table (using sql/games/*.sql)
+get_games_all(limit, order_by)  # Uses games/select_all.sql
+get_games_recent(limit)         # Uses games/select_recent.sql
+create_game_record(game_data)   # Uses games/insert_game.sql
+check_game_exists(game_id)      # Uses games/check_exists.sql
 
-# Clients Table
-get_clients_all()               # Get all registered clients
-get_clients_by_id(client_id)    # Get specific client
-create_client_record()          # Insert new client
-update_clients_info()           # Update client information
-update_clients_last_active()    # Update last active timestamp
-check_client_exists()           # Check if client exists
-get_clients_count()             # Total clients count
+# Clients Table (using sql/clients/*.sql)
+get_clients_all()               # Uses clients/select_all.sql
+create_client_record()          # Uses clients/insert_client.sql
+update_clients_info()           # Uses clients/update_info.sql
 
-# API Keys Table
-get_api_keys_all()              # Get all API keys
-get_api_keys_by_client()        # Get API key for client
-get_api_keys_by_key()           # Get API key record by key value
-create_api_key_record()         # Create new API key
-update_api_key_record()         # Update existing API key
-delete_api_keys_expired()       # Clean up expired keys
-validate_api_key(api_key)       # Validate API key and return client_id
+# API Keys Table (using sql/api_keys/*.sql)
+get_api_keys_by_key()           # Uses api_keys/select_by_key.sql
+create_api_key_record()         # Uses api_keys/insert_key.sql
+validate_api_key(api_key)       # Uses api_keys/select_by_key.sql
 
-# Statistics
-get_database_stats()            # Basic database statistics (counts only)
+# Files Table (using sql/files/*.sql)
+get_files_by_client()           # Uses files/select_by_client.sql
+create_file_record()            # Uses files/insert_file.sql
+get_file_by_hash()              # Uses files/select_by_hash.sql
+
+# Dynamic Query Execution
+add_custom_query_execution()    # Execute any available SQL file
+execute_formatted_query()       # Execute with template variables
+reload_sql_queries()            # Reload SQL files (development)
 ```
 
 ### utils.py - Shared Utilities & Business Logic Helpers ✅ COMPLETE
@@ -178,10 +223,11 @@ process_player_detailed_request() # Handle detailed player requests
 - API data processing and JSON response formatting
 - Advanced filtering logic for detailed analysis
 - Client management and authentication
+- File upload processing and management
 - Request validation and error handling
 
 **Import Rules**: Can import `database`, `utils`, `config`
-**Status**: Complete with comprehensive API functionality
+**Status**: Complete with comprehensive API functionality including file uploads
 
 **Key Functions:**
 ```python
@@ -195,6 +241,12 @@ process_detailed_player_data()  # Detailed player data with filtering
 process_paginated_player_games() # Paginated game history
 process_player_basic_stats()    # Basic player statistics
 process_server_statistics()     # Server health and stats
+
+# File Upload Management
+process_file_upload()           # Handle individual file uploads
+process_combined_upload()       # Handle games + files together
+save_uploaded_file()            # Save files to organized directory structure
+calculate_file_hash()           # SHA-256 hash calculation
 
 # Client Management
 register_or_update_client()     # Register/update client information
@@ -213,7 +265,7 @@ process_games_upload()          # Handle games upload API
 - Route handlers for both web and API endpoints
 - Authentication decorators (`require_api_key`, `rate_limited`)
 - Error handlers for all HTTP status codes
-- Static file serving
+- Static file serving and file upload endpoints
 
 **Import Rules**: Can import all service modules
 **Status**: Clean and well-organized with proper service separation
@@ -240,7 +292,10 @@ Configuration loading           # Secret key, debug settings
 /api/player/<code>/games        # Paginated game history
 /api/player/<code>/detailed     # Advanced filtering (POST)
 /api/clients/register           # Client registration
-/api/games/upload               # Game data upload
+/api/games/upload               # Game data upload (legacy + combined)
+/api/files/upload               # File upload endpoint
+/api/files                      # List files by client
+/api/files/<id>                 # Get file details
 /api/stats                      # Server statistics
 
 # Error Handlers
@@ -248,202 +303,409 @@ Configuration loading           # Secret key, debug settings
 Exception handler               # Catch-all error handling
 ```
 
+## SQL File Management System
+
+### Overview
+The new SQL management system provides:
+- **Dynamic Discovery**: Automatically finds and loads .sql files
+- **Category Organization**: Queries organized by database table/function
+- **Template Support**: Dynamic variable substitution in queries
+- **Hot Reloading**: Update SQL files without restarting the application
+
+### Directory Structure
+```
+backend/sql/
+├── schema/
+│   ├── init_tables.sql         # Database table creation
+│   └── init_indexes.sql        # Performance indexes
+├── games/
+│   ├── select_all.sql          # Get all games with options
+│   ├── select_recent.sql       # Recent games by date
+│   ├── insert_game.sql         # Insert new game record
+│   └── check_exists.sql        # Check if game exists
+├── clients/
+│   ├── select_all.sql          # Get all clients
+│   ├── insert_client.sql       # Register new client
+│   └── update_last_active.sql  # Update client activity
+├── api_keys/
+│   ├── select_by_key.sql       # Validate API key
+│   ├── insert_key.sql          # Create new API key
+│   └── delete_expired.sql      # Clean up expired keys
+├── files/
+│   ├── select_by_client.sql    # Get files by client
+│   ├── insert_file.sql         # Store file record
+│   └── select_by_hash.sql      # Find file by hash
+└── stats/
+    ├── unique_players.sql      # Count unique players
+    ├── file_stats_totals.sql   # File storage statistics
+    └── latest_upload.sql       # Most recent upload time
+```
+
+### Adding New Queries
+
+#### 1. Simple Query Addition
+Create a new .sql file in the appropriate category:
+
+```bash
+# Add a query to find games by stage
+cat > backend/sql/games/select_by_stage.sql << 'EOF'
+SELECT * FROM games 
+WHERE stage_id = ? 
+ORDER BY start_time DESC
+EOF
+```
+
+Use immediately in Python:
+```python
+# No code changes needed - automatically available
+from backend.database import add_custom_query_execution
+stage_games = add_custom_query_execution('games', 'select_by_stage', params=(31,))
+```
+
+#### 2. Template Query Addition
+Create queries with dynamic placeholders:
+
+```bash
+# Add a flexible tournament query
+cat > backend/sql/games/select_tournament_games.sql << 'EOF'
+SELECT * FROM games 
+WHERE game_type = '{tournament_type}'
+  AND datetime(start_time) >= datetime('{start_date}')
+ORDER BY {order_field} {order_direction}
+LIMIT {limit_count}
+EOF
+```
+
+Use with template variables:
+```python
+from backend.database import execute_formatted_query
+tournament_games = execute_formatted_query(
+    'games', 'select_tournament_games',
+    tournament_type='bracket',
+    start_date='2024-01-01',
+    order_field='start_time',
+    order_direction='DESC',
+    limit_count=100
+)
+```
+
+#### 3. New Category Addition
+Create entirely new query categories:
+
+```bash
+# Create analytics category
+mkdir backend/sql/analytics
+
+# Add complex analysis query
+cat > backend/sql/analytics/player_matchup_matrix.sql << 'EOF'
+WITH matchups AS (
+    SELECT 
+        json_extract(p1.value, '$.player_tag') as player1,
+        json_extract(p1.value, '$.character_name') as char1,
+        json_extract(p2.value, '$.player_tag') as player2,
+        json_extract(p2.value, '$.character_name') as char2,
+        CASE WHEN json_extract(p1.value, '$.result') = 'Win' THEN 1 ELSE 0 END as p1_win
+    FROM games g,
+         json_each(g.player_data) p1,
+         json_each(g.player_data) p2
+    WHERE p1.key != p2.key
+)
+SELECT 
+    player1, char1, player2, char2,
+    COUNT(*) as total_games,
+    SUM(p1_win) as wins,
+    ROUND(AVG(p1_win) * 100, 2) as win_rate
+FROM matchups
+GROUP BY player1, char1, player2, char2
+HAVING total_games >= {min_games}
+ORDER BY total_games DESC, win_rate DESC
+EOF
+```
+
+Use immediately:
+```python
+# Analytics queries become available automatically
+matchup_data = execute_formatted_query(
+    'analytics', 'player_matchup_matrix',
+    min_games=5
+)
+```
+
 ## Data Flow Architecture
 
-### Request Processing Flow
+### Request Processing Flow with SQL Files
 ```
-HTTP Request → app.py Route → Service Layer → Utils + Database → Response
+HTTP Request → app.py Route → Service Layer → Database Layer → SQL Files → Response
 ```
 
 **Detailed Flow:**
 1. **app.py** receives HTTP request and validates parameters
 2. **app.py** calls appropriate **Service** function (web_service or api_service)
 3. **Service** calls **Database** functions for raw data
-4. **Service** calls **Utils** functions for data processing
-5. **Service** applies business logic and returns processed data
-6. **app.py** formats response (HTML template or JSON)
-7. **app.py** returns HTTP response
+4. **Database** loads appropriate **SQL file** using sql_manager
+5. **Database** executes SQL with parameters/templates
+6. **Service** calls **Utils** functions for data processing
+7. **Service** applies business logic and returns processed data
+8. **app.py** formats response (HTML template or JSON)
+9. **app.py** returns HTTP response
 
-### Data Processing Patterns
+### SQL Query Execution Patterns
 
-#### Web Pages (Template Rendering)
+#### Basic Query Execution
 ```python
-# In backend/web_service.py
-def prepare_homepage_data():
-    raw_games = database.get_games_recent(10)     # Raw data access
-    recent_games = utils.process_recent_games_data(raw_games)  # Processing
-    # Apply web-specific business logic
-    return template_data
-
-# In app.py
-@app.route('/')
-def homepage():
-    data = web_service.prepare_homepage_data()    # Service handles logic
-    return render_template('pages/index/index.html', **data)
+# In database.py
+def get_games_recent(limit=10):
+    try:
+        query = sql_manager.get_query('games', 'select_recent')
+        return db_manager.execute_query(query, (limit,))
+    except Exception as e:
+        logger.error(f"Error getting recent games: {str(e)}")
+        return []
 ```
 
-#### API Endpoints (JSON Responses)
+#### Template Query Execution
 ```python
-# In backend/api_service.py
-def process_detailed_player_data(player_code, filters):
-    raw_games = database.get_games_all()         # Raw data access
-    player_games = utils.process_raw_games_for_player(raw_games, player_code)
-    filtered_games = apply_game_filters(player_games, **filters)  # API logic
-    return json_response_data
+# In database.py
+def get_games_all(limit=None, order_by='start_time DESC'):
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = sql_manager.format_query('games', 'select_all',
+                                            order_by=order_by,
+                                            limit_clause=f'LIMIT {limit}' if limit else '')
+            
+            cursor.execute(query)
+            return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error getting all games: {str(e)}")
+        return []
+```
 
-# In app.py
-@app.route('/api/player/<code>/detailed', methods=['POST'])
-def api_detailed(code):
-    filters = request.get_json()
-    result = api_service.process_detailed_player_data(code, filters)
-    return jsonify(result)
+#### Dynamic Query Discovery
+```python
+# Check what queries are available
+available_queries = sql_manager.list_available_queries()
+# Returns: {'games': ['select_all', 'select_recent', ...], 'clients': [...], ...}
+
+# Check if a specific query exists
+if sql_manager.has_query('analytics', 'player_performance'):
+    # Use the query
+    pass
+else:
+    # Fallback to different approach
+    pass
 ```
 
 ## Development Guidelines
 
 ### Adding New Functionality
 
-#### 1. Database Operations
-Add new functions to `database.py` with table-specific naming:
-```python
-def get_games_by_stage(stage_id):
-    """Get all games played on specific stage."""
-    with db_manager.get_connection() as conn:
-        # Raw SQL only, no business logic
-        return conn.execute("SELECT * FROM games WHERE stage_id = ?", (stage_id,)).fetchall()
+#### 1. Database Operations (New SQL File Approach)
+Add new SQL files to appropriate category:
+```bash
+# Create the SQL file
+cat > backend/sql/games/select_by_player_and_character.sql << 'EOF'
+SELECT * FROM games g, json_each(g.player_data) p
+WHERE json_extract(p.value, '$.player_tag') = ?
+  AND json_extract(p.value, '$.character_name') = ?
+ORDER BY datetime(g.start_time) DESC
+EOF
 ```
 
-#### 2. Shared Business Logic
-Add cross-service functionality to `utils.py`:
+Use in database.py:
 ```python
-def process_stage_statistics(raw_games):
-    """Process raw games to extract stage statistics."""
-    # Shared data processing logic
-    pass
+def get_games_by_player_and_character(player_tag, character):
+    """Get games for specific player using specific character."""
+    try:
+        query = sql_manager.get_query('games', 'select_by_player_and_character')
+        return db_manager.execute_query(query, (player_tag, character))
+    except Exception as e:
+        logger.error(f"Error getting games for {player_tag} with {character}: {str(e)}")
+        return []
 ```
 
-#### 3. Service-Specific Logic
-Add to appropriate service module:
-```python
-# In web_service.py for web pages
-def prepare_tournament_page_data():
-    """Prepare data for tournament page rendering."""
-    raw_games = database.get_games_all()
-    return utils.process_tournament_data(raw_games)
-
-# In api_service.py for API endpoints  
-def process_tournament_api_request(tournament_id, filters):
-    """Process tournament API request with filtering."""
-    raw_games = database.get_games_by_tournament(tournament_id)
-    return apply_tournament_filters(raw_games, filters)
+#### 2. Complex Analytics Queries
+Create sophisticated analysis queries:
+```bash
+# Advanced statistical analysis
+cat > backend/sql/analytics/stage_winrate_analysis.sql << 'EOF'
+WITH stage_performance AS (
+    SELECT 
+        g.stage_id,
+        json_extract(p.value, '$.player_tag') as player,
+        json_extract(p.value, '$.character_name') as character,
+        CASE WHEN json_extract(p.value, '$.result') = 'Win' THEN 1 ELSE 0 END as won
+    FROM games g, json_each(g.player_data) p
+    WHERE player = '{target_player}'
+)
+SELECT 
+    stage_id,
+    character,
+    COUNT(*) as games_played,
+    SUM(won) as wins,
+    ROUND(AVG(won) * 100, 2) as win_rate,
+    ROUND(
+        (AVG(won) - (SELECT AVG(won) FROM stage_performance)) * 100, 
+        2
+    ) as win_rate_vs_average
+FROM stage_performance
+GROUP BY stage_id, character
+HAVING games_played >= {min_games}
+ORDER BY win_rate DESC
+EOF
 ```
 
-#### 4. Route Handlers
-Add to `app.py` with clear service separation:
+#### 3. Shared Business Logic
+Add to utils.py for cross-service functionality:
 ```python
-@app.route('/tournaments')
-def web_tournaments():
-    data = web_service.prepare_tournament_page_data()
-    return render_template('pages/tournaments.html', **data)
-
-@app.route('/api/tournaments/<id>')
-def api_tournament_data(id):
-    result = api_service.process_tournament_api_request(id, request.json)
-    return jsonify(result)
+def process_stage_performance_data(raw_performance_data):
+    """Process raw stage performance into display format."""
+    stage_names = {
+        2: "Fountain of Dreams",
+        31: "Battlefield", 
+        32: "Final Destination"
+        # etc.
+    }
+    
+    processed = []
+    for row in raw_performance_data:
+        processed.append({
+            'stage_name': stage_names.get(row['stage_id'], f"Stage {row['stage_id']}"),
+            'character': row['character'],
+            'stats': {
+                'games': row['games_played'],
+                'wins': row['wins'],
+                'win_rate': row['win_rate'],
+                'vs_average': row['win_rate_vs_average']
+            }
+        })
+    
+    return processed
 ```
 
-### Module Design Principles
+#### 4. Service Integration
+Use in service layers:
+```python
+# In api_service.py
+def process_player_stage_analysis(player_code, min_games=5):
+    """Get stage performance analysis for a player."""
+    try:
+        # Use the new SQL query
+        raw_data = execute_formatted_query(
+            'analytics', 'stage_winrate_analysis',
+            target_player=player_code,
+            min_games=min_games
+        )
+        
+        # Process using utils
+        return process_stage_performance_data(raw_data)
+    except Exception as e:
+        logger.error(f"Error analyzing stage performance for {player_code}: {str(e)}")
+        raise
+```
 
-#### 1. Single Responsibility
-- Each module has one clear purpose
-- Functions within modules have specific, focused responsibilities
-- No mixing of concerns between layers
+#### 5. Route Handlers
+Add to app.py:
+```python
+@app.route('/api/player/<encoded_player_code>/stage-analysis')
+@require_api_key
+def api_player_stage_analysis(encoded_player_code, client_id):
+    """Get stage performance analysis for a player."""
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+        min_games = int(request.args.get('min_games', '5'))
+        
+        result = api_service.process_player_stage_analysis(player_code, min_games)
+        return jsonify({
+            'player_code': player_code,
+            'stage_analysis': result
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+```
 
-#### 2. Dependency Direction
-- Higher-level modules depend on lower-level modules
-- No circular dependencies allowed
-- Database layer is the foundation, services build on top
+### SQL File Organization Best Practices
 
-#### 3. Data Flow Consistency
-- Raw data comes from database layer
-- Processing happens in utils or services
-- Business logic stays in service layers
-- HTTP handling only in app.py
+#### 1. Naming Conventions
+- **Categories**: Use table names or functional areas (games, clients, analytics)
+- **Files**: Use verb_object pattern (select_all, insert_game, update_info)
+- **Complex queries**: Use descriptive names (player_matchup_analysis, stage_performance_stats)
 
-#### 4. Error Handling Strategy
-- Database layer: Log errors and raise exceptions
-- Utils layer: Handle data processing errors gracefully
-- Service layer: Validate inputs and handle business logic errors
-- App layer: Convert exceptions to appropriate HTTP responses
+#### 2. Template Variables
+- Use `{variable_name}` for dynamic substitution
+- Document required variables in SQL comments
+- Provide sensible defaults where possible
+
+#### 3. Query Documentation
+Add comments to complex SQL files:
+```sql
+-- Player matchup analysis with character breakdown
+-- Template variables:
+--   {target_player} - Player tag to analyze
+--   {min_games} - Minimum games required for inclusion
+--   {date_filter} - Optional date filter (default: all time)
+
+WITH player_matchups AS (
+    -- Get all games involving the target player
+    SELECT ...
+)
+-- Main analysis query
+SELECT ...
+```
+
+### Performance Considerations
+
+#### 1. SQL Query Optimization
+- Create appropriate indexes for new query patterns
+- Use EXPLAIN QUERY PLAN for complex queries
+- Consider materialized views for expensive calculations
+
+#### 2. Query Caching
+- SQL manager caches loaded queries in memory
+- Use `reload_sql_queries()` during development
+- Consider Redis caching for expensive query results
+
+#### 3. File Organization
+- Keep related queries in the same category
+- Split very large queries into smaller, composable pieces
+- Use template variables to reduce query duplication
 
 ## Testing Strategy
 
-### Database Layer Testing
+### SQL File Testing
 ```python
-# Test with in-memory SQLite
-def test_game_operations():
-    # Create test database in memory
-    # Test CRUD operations
-    # Verify data integrity
+def test_sql_files_load():
+    """Test that all SQL files load without syntax errors."""
+    sql_manager.reload_queries()
+    categories = sql_manager.get_categories()
+    assert len(categories) > 0
+    
+    for category in categories:
+        queries = sql_manager.get_category_queries(category)
+        assert len(queries) > 0
+
+def test_template_substitution():
+    """Test template variable substitution."""
+    # Assuming we have a templated query
+    query = sql_manager.format_query('games', 'select_all', 
+                                    order_by='start_time', 
+                                    limit_clause='LIMIT 10')
+    assert 'start_time' in query
+    assert 'LIMIT 10' in query
 ```
 
-### Service Layer Testing
+### Database Integration Testing
 ```python
-# Mock database calls, test business logic
-def test_player_stats_calculation():
-    # Mock raw game data
-    # Test statistics calculation
-    # Verify output format
+def test_new_query_execution():
+    """Test new SQL queries work with real database."""
+    # Test with in-memory database
+    with db_manager.get_connection() as conn:
+        # Setup test data
+        # Execute new queries
+        # Verify results
+        pass
 ```
-
-### Integration Testing
-```python
-# Test full request flow
-def test_player_profile_endpoint():
-    # Mock database with test data
-    # Make HTTP request
-    # Verify response content and format
-```
-
-## Performance Considerations
-
-### Database Query Optimization
-- Use indexes for frequently queried columns
-- Limit result sets with LIMIT clauses
-- Use prepared statements for repeated queries
-- Consider pagination for large datasets
-
-### Caching Strategy
-- Cache expensive calculations in service layer
-- Use database connection pooling for high traffic
-- Consider Redis for session storage in production
-
-### Memory Management
-- Process large datasets in chunks
-- Use generators for streaming large result sets
-- Clean up temporary data structures
-
-## Deployment Considerations
-
-### Environment Configuration
-```bash
-# Production environment variables
-export FLASK_ENV=production
-export SECRET_KEY=your-secret-key
-export DATABASE_PATH=/path/to/production.db
-export SLIPPI_REGISTRATION_SECRET=your-registration-secret
-```
-
-### Database Management
-- Regular backups of SQLite database
-- Monitor database size and performance
-- Consider PostgreSQL for high-volume deployments
-
-### Security
-- API key management and rotation
-- Rate limiting configuration
-- Input validation and sanitization
-- HTTPS in production
 
 ## Current Status & Future Plans
 
@@ -451,12 +713,22 @@ export SLIPPI_REGISTRATION_SECRET=your-registration-secret
 - **Phase 1**: Configuration & Database (COMPLETE)
 - **Phase 2**: Services & Utilities (COMPLETE)  
 - **Phase 3**: Data Layer Refactoring (COMPLETE)
+- **Phase 4**: SQL File Externalization (COMPLETE)
 
 ### 🔄 Current State
-The backend has a **clean, maintainable architecture** that is production-ready.
+The backend now has a **clean, maintainable architecture with external SQL file management** that is production-ready and highly extensible.
+
+### Key Benefits of SQL File System
+- **Developer Friendly**: Easy to read, write, and maintain SQL
+- **Version Control**: SQL changes tracked in git like code
+- **Hot Reloading**: Update queries without application restart
+- **Dynamic Discovery**: Add queries without modifying Python code
+- **Template Support**: Flexible, reusable query patterns
+- **Category Organization**: Logical grouping of related operations
 
 ### 📋 Future Enhancements
-- **Route Blueprints**: Organize routes into blueprint modules
-- **Service Layer Expansion**: More granular service modules for complex features
-- **Background Tasks**: Celery integration for heavy processing
-- **API Versioning**: Version management for API endpoints
+- **Query Performance Monitoring**: Track slow queries and optimization opportunities
+- **SQL Migration System**: Versioned schema changes with rollback capability  
+- **Query Builder Integration**: Optional programmatic query construction for complex scenarios
+- **Caching Layer**: Redis integration for expensive query result caching
+- **Database Abstraction**: Support for PostgreSQL and other databases beyond SQLite
