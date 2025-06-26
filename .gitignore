@@ -27,6 +27,9 @@ backups/
 .DS_Store
 Thumbs.db
 
+# Sensitive scripts
+*.sh
+
 # Instance folder
 instance/
 
