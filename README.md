@@ -10,6 +10,7 @@ Slippi Stats Server provides:
 - **Real-time Data Visualization** with interactive charts and tables
 - **RESTful API** for programmatic access to game data
 - **Client Registration System** for automated replay collection
+- **Enterprise Observability** with OpenTelemetry for monitoring and debugging
 
 ## Quick Start
 
@@ -18,6 +19,7 @@ Slippi Stats Server provides:
 - SQLite 3 (included with Python)
 - Modern web browser with JavaScript enabled
 - Git (for development)
+- Docker (optional, for observability stack)
 
 ### Windows Development Setup
 ```cmd
@@ -53,20 +55,34 @@ pip install -r requirements.txt
 python app.py
 ```
 
+### Observability Setup (Optional)
+```bash
+# Start local observability stack with Docker
+docker-compose up -d
+
+# Access observability tools:
+# - Jaeger UI: http://localhost:16686 (distributed tracing)
+# - Grafana: http://localhost:3000 (dashboards, admin/admin)
+# - Prometheus: http://localhost:9090 (metrics)
+```
+
 ## Project Structure
 
 ```
 slippi_stats/
 ├── README.md                    # This file - project overview
-├── requirements.txt             # Python dependencies
+├── requirements.txt             # Python dependencies with observability
 ├── start_dev.bat               # Windows development script
+├── docker-compose.yml          # Local observability stack
 ├── app.py                      # Flask application entry point (lightweight)
 ├── backend/                    # Backend modules
 │   ├── README.md              # Backend architecture details
 │   ├── config.py              # Configuration management
+│   ├── observability.py       # OpenTelemetry instrumentation
 │   ├── database.py            # Data access layer with external SQL
 │   ├── sql_manager.py         # Dynamic SQL file management
 │   ├── sql/                   # External SQL files organized by category
+│   │   ├── README.md          # SQL architecture and query management
 │   │   ├── schema/            # Database schema and indexes
 │   │   ├── games/             # Game-related queries
 │   │   ├── clients/           # Client management queries
@@ -83,19 +99,26 @@ slippi_stats/
 │   ├── web_service.py         # Web page business logic
 │   ├── api_service.py         # API business logic
 │   └── utils.py               # Shared utilities
-└── frontend/                  # Component-based frontend
-    ├── README.md              # Frontend architecture details
-    ├── base.html              # Foundation template
-    ├── base.css               # Global styles
-    ├── base.js                # Global utilities
-    ├── components/            # Self-contained UI components
-    ├── layouts/               # Component orchestration
-    └── pages/                 # Page-specific content
+├── frontend/                  # Component-based frontend
+│   ├── README.md              # Frontend architecture details
+│   ├── base.html              # Foundation template
+│   ├── base.css               # Global styles
+│   ├── base.js                # Global utilities
+│   ├── components/            # Self-contained UI components
+│   │   └── README.md          # Component development guide
+│   ├── layouts/               # Component orchestration
+│   │   └── README.md          # Layout architecture guide
+│   └── pages/                 # Page-specific content
+│       └── README.md          # Page development guide
+└── observability/             # Observability configuration
+    ├── otel-collector-config.yaml  # OpenTelemetry collector setup
+    ├── prometheus.yml          # Metrics collection configuration
+    └── grafana/               # Dashboard definitions
 ```
 
 ## Architecture
 
-This project follows a **modular architecture** with clear separation of concerns:
+This project follows a **modular architecture** with clear separation of concerns and comprehensive observability:
 
 ### Backend Architecture
 - **Lightweight Flask App** with application factory pattern
@@ -103,6 +126,7 @@ This project follows a **modular architecture** with clear separation of concern
 - **Service-oriented Business Logic** separated into web and API services
 - **External SQL Management** with dynamic query discovery and template support
 - **Pure Data Access Layer** with no business logic mixing
+- **OpenTelemetry Integration** for distributed tracing and metrics
 
 For detailed backend architecture, see [backend/README.md](backend/README.md)
 
@@ -121,6 +145,36 @@ For detailed frontend architecture, see [frontend/README.md](frontend/README.md)
 - **Comprehensive Error Handling** with user-friendly error pages
 
 For detailed routes architecture, see [backend/routes/README.md](backend/routes/README.md)
+
+### SQL Management
+- **External SQL Files** organized by functionality and automatically discovered
+- **Template Support** for dynamic query generation with variable substitution
+- **Category Organization** for logical grouping of related queries
+- **Version Control** of SQL changes alongside application code
+
+For detailed SQL architecture, see [backend/sql/README.md](backend/sql/README.md)
+
+### Component System
+- **Self-contained Packages** with templates, styles, and behavior
+- **Auto-initialization** for immediate usability when included
+- **Simple APIs** through macros and JavaScript methods
+- **BEM CSS Methodology** for consistent styling
+
+For component development, see [frontend/components/README.md](frontend/components/README.md)
+
+### Layout System
+- **Component Orchestration** importing and configuring components for pages
+- **Template Composition** combining components into reusable patterns
+- **Configuration Management** for flexible navbar and component setup
+
+For layout development, see [frontend/layouts/README.md](frontend/layouts/README.md)
+
+### Page System
+- **Business Logic Coordination** handling API calls and component interaction
+- **Error Handling Strategy** with user feedback and graceful degradation
+- **Performance Optimization** with lazy loading and memory management
+
+For page development, see [frontend/pages/README.md](frontend/pages/README.md)
 
 ## Features
 
@@ -144,6 +198,13 @@ For detailed routes architecture, see [backend/routes/README.md](backend/routes/
 - **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
 - **Smart Search**: Flexible player search with case-insensitive matching
 - **Error Handling**: User-friendly error pages with helpful navigation
+
+### Observability & Monitoring
+- **Distributed Tracing**: Request flow visibility across all application layers
+- **Business Metrics**: Games processed, files uploaded, API usage tracking
+- **Performance Monitoring**: Response times, database query performance, error rates
+- **Real-time Dashboards**: Grafana dashboards for operational insights
+- **Alerting**: Automated alerts for system health and performance issues
 
 ## API Documentation
 
@@ -175,6 +236,22 @@ export FLASK_ENV=production
 export SECRET_KEY=your-secret-key
 export SLIPPI_REGISTRATION_SECRET=your-registration-secret
 export DATABASE_PATH=/path/to/production.db
+
+# Observability configuration
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://your-collector:4317
+export OTEL_SERVICE_NAME=slippi-stats-server
+export OTEL_ENVIRONMENT=production
+```
+
+### Observability Configuration
+```bash
+# Development with console output
+export OTEL_SERVICE_NAME=slippi-stats-server
+export OTEL_ENVIRONMENT=development
+
+# Production with OTLP collector
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://your-collector:4317
+export OTEL_RESOURCE_ATTRIBUTES=service.name=slippi-stats,environment=prod
 ```
 
 ## Database Schema
@@ -196,16 +273,29 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **File Upload System**: Secure upload and storage with deduplication
 - **Configuration Management**: Centralized with environment variable support
 - **Error Handling**: Comprehensive validation and user feedback
+- **Frontend Component System**: Self-contained packages with clear APIs
+- **Layout System**: Component orchestration and template composition
+- **Page System**: Business logic coordination and error handling
 
 ### 🔄 In Progress
-- **Frontend Component System**: Migrating to component-based architecture
+- **Observability Implementation**: OpenTelemetry integration for comprehensive monitoring
 - **Performance Optimization**: Database query optimization and caching
+- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
 
 ### 📋 Planned
-- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
+- **Observability Rollout**: 
+  - Phase 1: Core instrumentation and console output
+  - Phase 2: Local development stack with Jaeger and Prometheus
+  - Phase 3: Production deployment with OTLP collector
+  - Phase 4: Advanced dashboards, alerts, and SLA monitoring
 - **Export Features**: Statistics export and tournament bracket system
-- **Admin Interface**: Web-based administration panel
+- **Admin Interface**: Web-based administration panel with observability insights
 - **Database Migration System**: Versioned schema changes with rollback capability
+- **Advanced Monitoring**: 
+  - Business KPI tracking and alerting
+  - Performance regression detection
+  - Capacity planning and resource optimization
+  - Security monitoring and threat detection
 
 ## Contributing
 
@@ -214,6 +304,7 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **Routes**: Use blueprint organization with thin handlers delegating to services
 - **SQL**: Add new queries as external .sql files in appropriate categories
 - **Frontend**: Use the component-based architecture with self-contained packages
+- **Observability**: Add tracing decorators to new functions and metrics for business events
 - **Code Style**: Follow PEP 8 for Python, component patterns for frontend
 - **Testing**: Database functions should be testable with in-memory SQLite
 
@@ -221,14 +312,19 @@ All SQL queries are managed through external .sql files for better maintainabili
 1. Fork the repository
 2. Create a feature branch
 3. Set up development environment using `start_dev.bat` or manual setup
-4. Make your changes following the architecture patterns
-5. Test your changes thoroughly
-6. Submit a pull request
+4. Optional: Start observability stack with `docker-compose up -d`
+5. Make your changes following the architecture patterns
+6. Test your changes thoroughly
+7. Submit a pull request
 
 ### Architecture Documentation
 - For backend development details: [backend/README.md](backend/README.md)
 - For routes development details: [backend/routes/README.md](backend/routes/README.md)
+- For SQL query management: [backend/sql/README.md](backend/sql/README.md)
 - For frontend development details: [frontend/README.md](frontend/README.md)
+- For component development: [frontend/components/README.md](frontend/components/README.md)
+- For layout development: [frontend/layouts/README.md](frontend/layouts/README.md)
+- For page development: [frontend/pages/README.md](frontend/pages/README.md)
 
 ### Adding New Features
 
@@ -237,17 +333,33 @@ All SQL queries are managed through external .sql files for better maintainabili
 2. Add business logic to `backend/web_service.py`
 3. Create template in `frontend/pages/`
 4. Add any new SQL queries to appropriate `backend/sql/` category
+5. Add observability decorators for tracing and metrics
 
 #### New API Endpoint
-1. Add route to `backend/routes/api_routes.py`
-2. Add business logic to `backend/api_service.py`
+1. Add route to `backend/routes/api_routes.py` with `@trace_api_endpoint`
+2. Add business logic to `backend/api_service.py` with `@trace_function`
 3. Add any new SQL queries to appropriate `backend/sql/` category
-4. Update API documentation
+4. Add metrics for business events and performance tracking
+5. Update API documentation
 
 #### New Database Queries
 1. Create .sql file in appropriate `backend/sql/` category
 2. Use the query via `sql_manager.get_query()` in database functions
-3. No Python code changes needed - queries are discovered automatically
+3. Add `@trace_database_operation` decorator for performance monitoring
+4. No Python code changes needed - queries are discovered automatically
+
+#### New Frontend Components
+1. Create component package in `frontend/components/`
+2. Follow the component development guide
+3. Add to layouts as needed
+4. Test component independence and reusability
+
+#### Adding Observability
+1. Use `@trace_function` for business logic functions
+2. Use `@trace_database_operation` for database operations
+3. Use `@trace_api_endpoint` for API routes
+4. Record custom metrics with `observability.record_*()` methods
+5. Add custom spans for complex operations
 
 ## License
 
@@ -259,3 +371,23 @@ For issues, feature requests, or questions:
 1. Check existing issues in the repository
 2. Create a new issue with detailed description
 3. Follow the contributing guidelines for code submissions
+
+## Monitoring and Operations
+
+### Health Checks
+- Application health: `GET /api/stats`
+- Database connectivity: Automatic via SQLite instrumentation
+- File system access: Monitored via file upload metrics
+
+### Performance Monitoring
+- Request latency: Tracked automatically via OpenTelemetry
+- Database query performance: Monitored per query type
+- Business metrics: Games processed, files uploaded, API usage
+
+### Alerting (Planned)
+- High error rates (>5% for 5 minutes)
+- Slow database queries (>1s p95 for 5 minutes)
+- No data uploads (>1 hour without game uploads)
+- High memory usage (>80% for 10 minutes)
+
+This comprehensive architecture provides a scalable, maintainable foundation with enterprise-grade observability for monitoring, debugging, and optimizing the application in both development and production environments.
