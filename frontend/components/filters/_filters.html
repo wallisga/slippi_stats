@@ -1,10 +1,10 @@
-<!-- frontend/components/filters/_filters.html -->
+<!-- Enhanced frontend/components/filters/_filters.html with Search Integration -->
 {# Component manages its own assets #}
 <link rel="stylesheet" href="{{ url_for('static', filename='components/filters/filters.css') }}">
 <script src="{{ url_for('static', filename='components/filters/filters.js') }}"></script>
 
 {# ============================================================================= #}
-{# ADVANCED FILTERS CARD MACRO - SIMPLIFIED #}
+{# ADVANCED FILTERS CARD MACRO - WITH SEARCH INTEGRATION #}
 {# ============================================================================= #}
 {% macro advanced_filters_card() %}
 <div class="card mb-4 filter-card">
@@ -22,13 +22,13 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    {{ filter_column("Your Character", "character", "All Characters") }}
+                    {{ filter_column_with_search("Your Character", "character", "All Characters", "Search characters...") }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    {{ filter_column("Opponent", "opponent", "All Opponents") }}
+                    {{ filter_column_with_search("Opponent", "opponent", "All Opponents", "Search opponents...") }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    {{ filter_column("Opponent's Character", "opponentChar", "All Characters") }}
+                    {{ filter_column_with_search("Opponent's Character", "opponentChar", "All Characters", "Search characters...") }}
                 </div>
             </div>
             <div class="row">
@@ -45,7 +45,43 @@
 {% endmacro %}
 
 {# ============================================================================= #}
-{# FILTER COLUMN MACRO - SIMPLIFIED (CHECKBOXES ONLY) #}
+{# ENHANCED FILTER COLUMN MACRO - WITH SEARCH INPUT #}
+{# ============================================================================= #}
+{% macro filter_column_with_search(label, filter_type, placeholder, search_placeholder) %}
+<div class="mb-2">
+    <label class="form-label mb-2 fw-semibold">{{ label }}</label>
+</div>
+
+<!-- Search Input for this filter column -->
+<div class="filter-search-input mb-2">
+    <div class="input-group input-group-sm">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" 
+               class="form-control form-control-sm" 
+               placeholder="{{ search_placeholder }}"
+               id="{{ filter_type }}Search"
+               autocomplete="off">
+        <button type="button" 
+                class="btn btn-outline-secondary btn-sm" 
+                onclick="document.getElementById('{{ filter_type }}Search').value=''; window.advancedFilters && window.advancedFilters.clearSearch('{{ filter_type.replace('Char', '_character').replace('opponent', 'opponent').replace('character', 'character') }}');">
+            <i class="bi bi-x"></i>
+        </button>
+    </div>
+    <!-- Search result count (hidden by default) -->
+    <small class="search-result-count text-muted mt-1" style="display: none;"></small>
+</div>
+
+<!-- Filter checkboxes container -->
+<div class="filter-checkboxes-horizontal" id="{{ filter_type }}Checkboxes">
+    <div class="checkbox-item select-all-option">
+        <input class="form-check-input select-all" type="checkbox" id="selectAll{{ filter_type.title() }}s" checked>
+        <label class="form-check-label" for="selectAll{{ filter_type.title() }}s">{{ placeholder }}</label>
+    </div>
+</div>
+{% endmacro %}
+
+{# ============================================================================= #}
+{# LEGACY FILTER COLUMN MACRO - FOR BACKWARD COMPATIBILITY #}
 {# ============================================================================= #}
 {% macro filter_column(label, filter_type, placeholder) %}
 <div class="mb-2">

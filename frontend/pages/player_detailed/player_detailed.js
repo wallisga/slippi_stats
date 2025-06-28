@@ -1,11 +1,12 @@
-// Player Detailed Page JavaScript - BUSINESS LOGIC ONLY
+// Enhanced Player Detailed Page JavaScript with Search-Filter Coordination
+// frontend/pages/player_detailed/player_detailed.js
 
 let playerData = null;
 let playerTitleComponent = null;
 let originalPlayerStats = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Player detailed page initializing...');
+    console.log('Player detailed page initializing with search-filter coordination...');
     
     // Get template data
     const originalData = getPlayerDataFromTemplate();
@@ -26,19 +27,252 @@ document.addEventListener('DOMContentLoaded', function() {
     // ✅ BUSINESS LOGIC: Initialize player title
     playerTitleComponent = initializePlayerTitle(originalData);
     
-    // ✅ COMPONENT INTERACTION: Connect filters component to page functionality
-    if (window.advancedFilters) {
-        window.advancedFilters.onFilterChange((filters) => {
-            console.log('Filters changed:', filters);
-            fetchPlayerData(filters);
-        });
-    }
+    // ✅ COMPONENT COORDINATION: Setup search-enhanced filters
+    setupSearchEnhancedFilters();
     
     // ✅ BUSINESS LOGIC: Load initial data
     fetchPlayerData();
     
-    console.log('Player detailed page loaded');
+    console.log('Player detailed page loaded with search integration');
 });
+
+/**
+ * ✅ COMPONENT COORDINATION: Setup enhanced filters with search integration
+ */
+function setupSearchEnhancedFilters() {
+    if (!window.advancedFilters) {
+        console.warn('Advanced filters component not available');
+        return;
+    }
+    
+    // Connect filters component to page functionality
+    window.advancedFilters.onFilterChange((filters) => {
+        console.log('Filters changed with search integration:', filters);
+        fetchPlayerData(filters);
+    });
+    
+    // ✅ PAGE ORCHESTRATION: Setup keyboard shortcuts for filter search
+    setupFilterSearchShortcuts();
+    
+    console.log('Search-enhanced filters coordination established');
+}
+
+/**
+ * ✅ PAGE ORCHESTRATION: Setup keyboard shortcuts for filter search
+ */
+function setupFilterSearchShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Shift + 1 - Focus character search
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '1') {
+            e.preventDefault();
+            focusFilterSearch('characterSearch');
+        }
+        
+        // Ctrl/Cmd + Shift + 2 - Focus opponent search
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '2') {
+            e.preventDefault();
+            focusFilterSearch('opponentSearch');
+        }
+        
+        // Ctrl/Cmd + Shift + 3 - Focus opponent character search
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '3') {
+            e.preventDefault();
+            focusFilterSearch('opponentCharSearch');
+        }
+    });
+}
+
+/**
+ * ✅ COMPONENT INTERACTION: Focus specific filter search input
+ */
+function focusFilterSearch(searchInputId) {
+    const searchInput = document.getElementById(searchInputId);
+    if (searchInput && searchInput.offsetParent !== null) {
+        searchInput.focus();
+        searchInput.select();
+        
+        // Expand filters if collapsed
+        const filterCollapse = document.getElementById('filterCollapse');
+        if (filterCollapse && !filterCollapse.classList.contains('show')) {
+            const collapseButton = document.querySelector('[data-bs-target="#filterCollapse"]');
+            if (collapseButton) {
+                collapseButton.click();
+            }
+        }
+    }
+}
+
+/**
+ * ✅ PAGE ORCHESTRATION: Enhanced filter options management with search
+ */
+function enhanceFilterOptionsWithSearch(filterOptions) {
+    if (!window.advancedFilters || !filterOptions) {
+        return;
+    }
+    
+    console.log('Enhancing filter options with search capabilities:', {
+        characters: filterOptions.characters?.length || 0,
+        opponents: filterOptions.opponents?.length || 0,
+        opponent_characters: filterOptions.opponent_characters?.length || 0
+    });
+    
+    // ✅ COMPONENT INTERACTION: Populate filters with enhanced search
+    window.advancedFilters.populateFilterOptions(filterOptions);
+    
+    // ✅ PAGE LOGIC: Add search hints for large option sets
+    addSearchHintsForLargeOptionSets(filterOptions);
+    
+    // ✅ PAGE LOGIC: Setup auto-clear for specific searches
+    setupSmartSearchBehavior(filterOptions);
+}
+
+/**
+ * ✅ PAGE LOGIC: Add helpful hints when option sets are large
+ */
+function addSearchHintsForLargeOptionSets(filterOptions) {
+    const hints = {
+        characters: filterOptions.characters?.length || 0,
+        opponents: filterOptions.opponents?.length || 0,
+        opponent_characters: filterOptions.opponent_characters?.length || 0
+    };
+    
+    // Add hints for large option sets
+    Object.entries(hints).forEach(([type, count]) => {
+        if (count > 20) {
+            const searchInputId = getSearchInputId(type);
+            const searchInput = document.getElementById(searchInputId);
+            
+            if (searchInput) {
+                // Update placeholder with helpful hint
+                const originalPlaceholder = searchInput.placeholder;
+                searchInput.placeholder = `Search ${count} ${type.replace('_', ' ')}...`;
+                
+                // Add tooltip or small text hint
+                addSearchHintText(searchInput, count, type);
+            }
+        }
+    });
+}
+
+/**
+ * ✅ PAGE LOGIC: Get search input ID for filter type
+ */
+function getSearchInputId(filterType) {
+    const mapping = {
+        'characters': 'characterSearch',
+        'opponents': 'opponentSearch', 
+        'opponent_characters': 'opponentCharSearch'
+    };
+    return mapping[filterType] || 'characterSearch';
+}
+
+/**
+ * ✅ PAGE LOGIC: Add search hint text below input
+ */
+function addSearchHintText(searchInput, count, type) {
+    const container = searchInput.closest('.filter-search-input');
+    if (!container) return;
+    
+    // Remove existing hint
+    const existingHint = container.querySelector('.search-hint');
+    if (existingHint) {
+        existingHint.remove();
+    }
+    
+    // Add new hint if count is large
+    if (count > 50) {
+        const hint = document.createElement('small');
+        hint.className = 'search-hint text-muted mt-1';
+        hint.innerHTML = `💡 <strong>Tip:</strong> ${count} options available - use search to filter`;
+        hint.style.display = 'block';
+        hint.style.fontSize = '0.75rem';
+        container.appendChild(hint);
+    }
+}
+
+/**
+ * ✅ PAGE LOGIC: Setup smart search behavior for better UX
+ */
+function setupSmartSearchBehavior(filterOptions) {
+    // Auto-focus first search input if opponents list is very large
+    if (filterOptions.opponents && filterOptions.opponents.length > 100) {
+        setTimeout(() => {
+            const opponentSearch = document.getElementById('opponentSearch');
+            if (opponentSearch) {
+                // Add a subtle visual cue
+                opponentSearch.style.boxShadow = '0 0 0 2px rgba(13, 110, 253, 0.25)';
+                setTimeout(() => {
+                    opponentSearch.style.boxShadow = '';
+                }, 2000);
+            }
+        }, 1000);
+    }
+    
+    // Setup smart defaults for character searches
+    setupCharacterSearchDefaults(filterOptions);
+}
+
+/**
+ * ✅ PAGE LOGIC: Setup smart defaults for character searches  
+ */
+function setupCharacterSearchDefaults(filterOptions) {
+    // If there are many characters, pre-populate with common ones
+    const commonCharacters = [
+        'Fox', 'Falco', 'Marth', 'Sheik', 'Jigglypuff', 
+        'Peach', 'Captain Falcon', 'Ice Climbers'
+    ];
+    
+    if (filterOptions.characters && filterOptions.characters.length > 25) {
+        // Add quick filter buttons for common characters
+        addQuickCharacterFilters(commonCharacters, filterOptions.characters);
+    }
+}
+
+/**
+ * ✅ PAGE ENHANCEMENT: Add quick filter buttons for common characters
+ */
+function addQuickCharacterFilters(commonChars, allChars) {
+    const availableCommon = commonChars.filter(char => allChars.includes(char));
+    
+    if (availableCommon.length === 0) return;
+    
+    // Add quick filters to character section
+    const characterContainer = document.getElementById('characterCheckboxes');
+    if (!characterContainer) return;
+    
+    const quickFiltersContainer = document.createElement('div');
+    quickFiltersContainer.className = 'quick-filters mb-2';
+    quickFiltersContainer.innerHTML = `
+        <small class="text-muted d-block mb-1">Quick filters:</small>
+        <div class="d-flex flex-wrap gap-1">
+            ${availableCommon.map(char => 
+                `<button type="button" class="btn btn-outline-primary btn-xs quick-char-filter" data-character="${char}">
+                    ${char}
+                </button>`
+            ).join('')}
+        </div>
+    `;
+    
+    // Insert before the search input
+    const searchInput = characterContainer.querySelector('.filter-search-input');
+    if (searchInput) {
+        characterContainer.insertBefore(quickFiltersContainer, searchInput);
+    } else {
+        characterContainer.insertBefore(quickFiltersContainer, characterContainer.firstChild);
+    }
+    
+    // Setup quick filter functionality
+    quickFiltersContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('quick-char-filter')) {
+            const character = e.target.dataset.character;
+            const characterSearch = document.getElementById('characterSearch');
+            if (characterSearch) {
+                characterSearch.value = character;
+                characterSearch.dispatchEvent(new Event('input'));
+            }
+        }
+    });
+}
 
 function initializePlayerTitle(playerData) {
     const container = document.getElementById('player-title-container');
@@ -114,7 +348,7 @@ function getPlayerDataFromTemplate() {
     }
 }
 
-// ✅ BUSINESS LOGIC: API calls and data management
+// ✅ BUSINESS LOGIC: Enhanced API calls and data management with search coordination
 async function fetchPlayerData(filters = {}) {
     showLoading();
     
@@ -127,14 +361,21 @@ async function fetchPlayerData(filters = {}) {
             throw new Error('No player code available');
         }
         
-        console.log('Fetching data for player:', playerCode);
+        console.log('Fetching data for player with search-enhanced filters:', playerCode, filters);
         
-        // Save current filter selections before making API call
+        // Save current filter selections AND search states before making API call
         const savedSelections = {};
+        const savedSearches = {};
+        
         if (window.advancedFilters) {
             savedSelections.characters = window.advancedFilters.getSelectedCheckboxValues('characterCheckboxes');
             savedSelections.opponents = window.advancedFilters.getSelectedCheckboxValues('opponentCheckboxes');
             savedSelections.opponentChars = window.advancedFilters.getSelectedCheckboxValues('opponentCharCheckboxes');
+            
+            // Save search states
+            savedSearches.character = document.getElementById('characterSearch')?.value || '';
+            savedSearches.opponent = document.getElementById('opponentSearch')?.value || '';
+            savedSearches.opponentChar = document.getElementById('opponentCharSearch')?.value || '';
         }
         
         // Prepare filter data
@@ -160,14 +401,14 @@ async function fetchPlayerData(filters = {}) {
         }
         
         const data = await response.json();
-        console.log("Received detailed data:", data);
+        console.log("Received detailed data with filter options:", data);
         
         playerData = data;
         
-        // ✅ COMPONENT INTERACTION: Populate filters component with API data
-        if (window.advancedFilters && data.filter_options) {
-            console.log('Populating filters with options:', data.filter_options);
-            window.advancedFilters.populateFilterOptions(data.filter_options);
+        // ✅ COMPONENT COORDINATION: Enhanced filter population with search
+        if (data.filter_options) {
+            console.log('Populating search-enhanced filters with options:', data.filter_options);
+            enhanceFilterOptionsWithSearch(data.filter_options);
             
             // Restore previous selections if they existed
             if (savedSelections.characters && savedSelections.characters.length > 0) {
@@ -179,6 +420,18 @@ async function fetchPlayerData(filters = {}) {
             if (savedSelections.opponentChars && savedSelections.opponentChars.length > 0) {
                 window.advancedFilters.restoreCheckboxSelections('opponentCharCheckboxes', savedSelections.opponentChars);
             }
+            
+            // Restore search states
+            Object.entries(savedSearches).forEach(([type, value]) => {
+                if (value) {
+                    const inputId = getSearchInputId(type === 'opponentChar' ? 'opponent_characters' : type + 's');
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.value = value;
+                        input.dispatchEvent(new Event('input'));
+                    }
+                }
+            });
         }
         
         // ✅ COMPONENT COORDINATION: Update UI with filtered data
@@ -201,7 +454,7 @@ async function fetchPlayerData(filters = {}) {
 
 // ✅ COMPONENT COORDINATION: Update UI using component APIs
 function updateUI(data) {
-    console.log('Updating UI with data:', data);
+    console.log('Updating UI with search-filtered data:', data);
     
     // Update overall stats
     const overallWinRate = data.overall_winrate || 0;
@@ -221,12 +474,6 @@ function updateUI(data) {
     updateFilterSummary(data);
     
     // ✅ COMPONENT INTERACTION: Update stats tables using component
-    // Debug: Check if tables exist before updating
-    console.log('Checking for table elements...');
-    console.log('character-stats-table:', document.getElementById('character-stats-table'));
-    console.log('opponent-stats-table:', document.getElementById('opponent-stats-table'));
-    console.log('matchup-stats-table:', document.getElementById('matchup-stats-table'));
-    
     if (window.TablesComponent) {
         // Update character stats table
         if (data.character_stats) {
