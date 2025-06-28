@@ -107,13 +107,51 @@
     color: #495057;
 }
 
-/* Search result count styling */
+/* Search result count styling - Enhanced */
 .search-result-count {
     display: block;
     font-size: 0.8rem;
     color: #6c757d;
     margin-top: 0.25rem;
     text-align: center;
+    line-height: 1.2;
+}
+
+.search-result-count small {
+    font-size: 0.7rem;
+}
+
+.search-result-count .text-success {
+    color: #198754 !important;
+    font-weight: 500;
+}
+
+/* Enhanced select-all styling to show selection counts */
+.select-all-option label {
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+/* Styling for hidden checkboxes (searched but not visible) */
+.checkbox-item.searched-hidden {
+    display: none !important;
+}
+
+/* Visual indicator for selected but hidden items */
+.filter-checkboxes-horizontal::after {
+    content: "";
+    display: block;
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 0.25rem;
+    border-top: 1px solid #dee2e6;
+    margin-top: 0.5rem;
+}
+
+.filter-checkboxes-horizontal[data-hidden-selected]::after {
+    content: attr(data-hidden-selected) " more selected (hidden by search)";
 }
 
 /* Enhanced checkbox visibility for search results */

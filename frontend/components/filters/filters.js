@@ -123,9 +123,11 @@ class AdvancedFilters {
         const searchTerm = this.searchFilters[filterType];
         const checkboxItems = container.querySelectorAll('.checkbox-item:not(.select-all-option)');
         let visibleCount = 0;
+        let hiddenSelectedCount = 0;
         
         checkboxItems.forEach(item => {
             const label = item.querySelector('label');
+            const checkbox = item.querySelector('input[type="checkbox"]');
             if (!label) return;
             
             const text = label.textContent.toLowerCase();
@@ -133,14 +135,24 @@ class AdvancedFilters {
             
             if (matches) {
                 item.style.display = '';
+                item.classList.remove('searched-hidden');
                 visibleCount++;
             } else {
                 item.style.display = 'none';
+                item.classList.add('searched-hidden');
+                
+                // Count selected items that are hidden by search
+                if (checkbox && checkbox.checked) {
+                    hiddenSelectedCount++;
+                }
             }
         });
         
         // Update search result count
         this.updateSearchResultCount(containerId, visibleCount);
+        
+        // Show indicator for hidden selected items
+        this.updateHiddenSelectedIndicator(container, hiddenSelectedCount);
         
         // Update select-all checkbox state
         const selectAllId = {
@@ -155,14 +167,32 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Update search result count display
+     * NEW: Show indicator when selected items are hidden by search
+     */
+    updateHiddenSelectedIndicator(container, hiddenSelectedCount) {
+        if (hiddenSelectedCount > 0) {
+            container.setAttribute('data-hidden-selected', hiddenSelectedCount);
+        } else {
+            container.removeAttribute('data-hidden-selected');
+        }
+    }
+    
+    /**
+     * NEW: Update search result count display with selection info
      */
     updateSearchResultCount(containerId, visibleCount) {
         const countElement = document.querySelector(`#${containerId} .search-result-count`);
         if (countElement) {
             const totalCount = this.allOptions[this.getOptionsKey(containerId)]?.length || 0;
+            
+            // Also show how many are actually selected
+            const selectedCount = document.querySelectorAll(`#${containerId} input[type="checkbox"]:not(.select-all):checked`).length;
+            
             if (visibleCount < totalCount) {
-                countElement.textContent = `Showing ${visibleCount} of ${totalCount}`;
+                countElement.innerHTML = `
+                    Showing ${visibleCount} of ${totalCount}
+                    <br><small class="text-success">${selectedCount} selected total</small>
+                `;
                 countElement.style.display = 'block';
             } else {
                 countElement.style.display = 'none';
@@ -194,14 +224,11 @@ class AdvancedFilters {
         const container = document.getElementById(containerId);
         if (!container) return 'all';
         
-        // Only count visible checkboxes that are checked
+        // FIXED: Count ALL checked checkboxes regardless of search visibility
+        // Search is only a visual helper, not a filter for the actual selection
         const checkboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all):checked');
-        const visibleChecked = Array.from(checkboxes).filter(cb => {
-            const item = cb.closest('.checkbox-item');
-            return item && item.style.display !== 'none';
-        });
+        const selected = Array.from(checkboxes).map(cb => cb.value);
         
-        const selected = visibleChecked.map(cb => cb.value);
         return selected.length > 0 ? selected : 'all';
     }
     
@@ -270,14 +297,16 @@ class AdvancedFilters {
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', function() {
                 const checkboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all)');
-                const visibleCheckboxes = Array.from(checkboxes).filter(cb => {
-                    const item = cb.closest('.checkbox-item');
-                    return item && item.style.display !== 'none';
-                });
                 
-                visibleCheckboxes.forEach(cb => {
+                // FIXED: Apply select-all to ALL checkboxes, not just visible ones
+                // The user expects "select all" to mean "select all items", regardless of search
+                checkboxes.forEach(cb => {
                     cb.checked = this.checked;
                 });
+                
+                // Update the label after changing selections
+                const checkedCount = container.querySelectorAll('input[type="checkbox"]:not(.select-all):checked').length;
+                that.updateSelectAllLabel(this, checkedCount, checkboxes.length, containerId);
             });
             
             // Initialize select-all state
@@ -296,19 +325,41 @@ class AdvancedFilters {
         const selectAll = document.getElementById(selectAllId);
         if (!container || !selectAll) return;
         
-        // Only consider visible checkboxes
+        // FIXED: Base select-all state on ALL checkboxes, not just visible ones
+        // This ensures consistent behavior regardless of search state
         const allCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all)');
-        const visibleCheckboxes = Array.from(allCheckboxes).filter(cb => {
-            const item = cb.closest('.checkbox-item');
-            return item && item.style.display !== 'none';
-        });
+        const checkedCount = container.querySelectorAll('input[type="checkbox"]:not(.select-all):checked').length;
         
-        const checkedCount = visibleCheckboxes.filter(cb => cb.checked).length;
+        if (allCheckboxes.length === 0) return;
         
-        if (visibleCheckboxes.length === 0) return;
+        selectAll.checked = checkedCount === allCheckboxes.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
         
-        selectAll.checked = checkedCount === visibleCheckboxes.length;
-        selectAll.indeterminate = checkedCount > 0 && checkedCount < visibleCheckboxes.length;
+        // Update the label to show actual count vs visible count
+        this.updateSelectAllLabel(selectAll, checkedCount, allCheckboxes.length, containerId);
+    }
+    
+    /**
+     * NEW: Update select-all label to show actual selection count
+     */
+    updateSelectAllLabel(selectAllCheckbox, checkedCount, totalCount, containerId) {
+        const label = selectAllCheckbox.nextElementSibling;
+        if (!label) return;
+        
+        const baseText = {
+            'characterCheckboxes': 'All Characters',
+            'opponentCheckboxes': 'All Opponents', 
+            'opponentCharCheckboxes': 'All Characters'
+        }[containerId] || 'All Items';
+        
+        // Show actual selection count if not all are selected
+        if (checkedCount === totalCount) {
+            label.textContent = baseText;
+        } else if (checkedCount === 0) {
+            label.textContent = `${baseText} (none selected)`;
+        } else {
+            label.textContent = `${baseText} (${checkedCount}/${totalCount} selected)`;
+        }
     }
     
     resetAllFilters() {
