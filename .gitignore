@@ -23,6 +23,12 @@ backups/
 *.swp
 *.swo
 
+# Test coverage reports
+htmlcov/
+.coverage
+*.coverage
+.pytest_cache/
+
 # OS
 .DS_Store
 Thumbs.db

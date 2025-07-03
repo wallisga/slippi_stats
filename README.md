@@ -206,6 +206,43 @@ For page development, see [frontend/pages/README.md](frontend/pages/README.md)
 - **Real-time Dashboards**: Grafana dashboards for operational insights
 - **Alerting**: Automated alerts for system health and performance issues
 
+## Testing
+
+The project includes a comprehensive testing framework for confident development and refactoring.
+
+### Quick Start
+```bash
+# Run all tests
+run_tests.bat
+
+# Run specific test categories  
+run_tests.bat quick        # Fast service layer tests
+run_tests.bat api          # API endpoint tests
+run_tests.bat db           # Database integration tests
+run_tests.bat web          # Web page tests
+run_tests.bat coverage     # Generate coverage report
+```
+
+### Test Categories
+- **Service Layer Tests** (`tests/test_service_layer.py`) - Business logic contracts
+- **Database Tests** (`tests/test_database_simple.py`) - SQL files and database operations  
+- **API Tests** (`tests/test_api_endpoints.py`) - HTTP endpoints and responses
+- **Web Tests** (`tests/test_web_pages.py`) - Page rendering and navigation
+
+### Adding Tests
+See [tests/README.md](tests/README.md) for detailed guidance on:
+- When to add tests to each category
+- Test templates and examples
+- Best practices and troubleshooting
+- Integration with development workflow
+
+### Test-Driven Development
+The testing framework enables confident refactoring:
+1. Tests pass = changes are safe
+2. Tests fail = contracts broken, fix needed  
+3. Add tests before new features
+4. Use `run_tests.bat quick` during development
+
 ## API Documentation
 
 ### Player Endpoints
