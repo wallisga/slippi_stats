@@ -48,6 +48,8 @@ if "%1"=="web" goto web_tests
 if "%1"=="db" goto db_tests
 if "%1"=="service" goto service_tests
 if "%1"=="upload" goto upload_tests
+if "%1"=="utils" goto utils_tests
+if "%1"=="errors" goto error_tests
 if "%1"=="verbose" goto verbose_tests
 if "%1"=="coverage" goto coverage_tests
 
@@ -100,6 +102,20 @@ echo.
 pytest tests/test_upload_pipeline.py -v
 goto end
 
+:error_tests
+echo.
+echo Running error scenarios tests...
+echo.
+pytest tests/test_error_scenarios.py -v
+goto end
+
+:utils_tests
+echo.
+echo Running utils functions tests...
+echo.
+pytest tests/test_utils_functions.py -v
+goto end
+
 :verbose_tests
 echo.
 echo Running all tests with detailed output...
@@ -139,7 +155,10 @@ echo   quick        - Run only service layer tests (fastest)
 echo   api          - Run only API endpoint tests  
 echo   web          - Run only web page tests
 echo   db           - Run only database tests
+echo   error       - Run error scenarios tests
 echo   service      - Run only service layer tests
+echo   upload       - Run upload pipeline tests
+echo   utils        - Run utils functions tests
 echo   upload       - Run upload pipeline tests
 echo   verbose      - Run all tests with detailed output
 echo   coverage     - Run tests with coverage report

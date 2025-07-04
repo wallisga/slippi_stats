@@ -75,7 +75,8 @@ slippi_stats/
 ├── start_dev.bat               # Windows development script
 ├── docker-compose.yml          # Local observability stack
 ├── app.py                      # Flask application entry point (lightweight)
-├── backend/                    # Backend modules
+├── run_tests.bat               # Enhanced test runner with coverage
+├── backend/                    # Backend modules (service-oriented architecture)
 │   ├── README.md              # Backend architecture details
 │   ├── config.py              # Configuration management
 │   ├── observability.py       # OpenTelemetry instrumentation
@@ -110,6 +111,17 @@ slippi_stats/
 │   │   └── README.md          # Layout architecture guide
 │   └── pages/                 # Page-specific content
 │       └── README.md          # Page development guide
+├── tests/                     # Comprehensive testing framework
+│   ├── README.md              # Testing guide and architecture
+│   ├── conftest.py            # Test configuration and fixtures
+│   ├── pytest.ini            # Pytest configuration
+│   ├── test_service_layer.py  # ⚡ Business logic contracts (ENHANCED)
+│   ├── test_database_simple.py # 🔄 Database integration tests
+│   ├── test_api_endpoints.py  # 🔄 HTTP endpoints (EXPANDED)
+│   ├── test_web_pages.py      # 🔄 Web page rendering tests
+│   ├── test_utils_functions.py # ⚡ NEW: Utils function testing
+│   ├── test_upload_pipeline.py # 🔄 NEW: Upload workflow integration
+│   └── test_error_scenarios.py # ⚡ NEW: Error handling & edge cases
 └── observability/             # Observability configuration
     ├── otel-collector-config.yaml  # OpenTelemetry collector setup
     ├── prometheus.yml          # Metrics collection configuration
@@ -121,60 +133,75 @@ slippi_stats/
 This project follows a **modular architecture** with clear separation of concerns and comprehensive observability:
 
 ### Backend Architecture
-- **Lightweight Flask App** with application factory pattern
-- **Blueprint-based Routing** organized by functionality (web, api, static, errors)
-- **Service-oriented Business Logic** separated into web and API services
-- **External SQL Management** with dynamic query discovery and template support
-- **Pure Data Access Layer** with no business logic mixing
-- **OpenTelemetry Integration** for distributed tracing and metrics
-
-For detailed backend architecture, see [backend/README.md](backend/README.md)
+- **Service-Oriented Design**: Clean separation between web and API business logic
+- **External SQL Management**: SQL queries stored as external files with dynamic discovery
+- **Blueprint-Based Routing**: Organized route handlers with thin controllers
+- **Strict Import Hierarchy**: Enforced module dependencies prevent circular imports
+- **Comprehensive Testing**: Architecture-aligned testing with 75% coverage target
 
 ### Frontend Architecture
-- **Component-based Design** with self-contained packages
-- **Template Inheritance** following base → layout → page pattern
-- **Asset Management** where components own their CSS/JS
-- **Bootstrap Integration** with modern responsive design
+- **Component-Based System**: Self-contained UI components with clear interfaces
+- **Layout Orchestration**: Flexible layout system for component composition
+- **Progressive Enhancement**: Works without JavaScript, enhanced with it
+- **Bootstrap Foundation**: Responsive design with custom component styling
 
-For detailed frontend architecture, see [frontend/README.md](frontend/README.md)
+### Observability Architecture
+- **Distributed Tracing**: OpenTelemetry instrumentation across all layers
+- **Business Metrics**: Custom metrics for games processed, API usage, performance
+- **Real-time Monitoring**: Grafana dashboards with automated alerting
+- **Development-Friendly**: Local observability stack with Docker
 
-### Routes Architecture
-- **Blueprint Organization** separating web pages, API endpoints, and static files
-- **Thin Route Handlers** with business logic delegated to service layers
-- **Authentication & Rate Limiting** implemented as decorators
-- **Comprehensive Error Handling** with user-friendly error pages
+## Testing
 
-For detailed routes architecture, see [backend/routes/README.md](backend/routes/README.md)
+The project includes a comprehensive testing framework designed for confident refactoring:
 
-### SQL Management
-- **External SQL Files** organized by functionality and automatically discovered
-- **Template Support** for dynamic query generation with variable substitution
-- **Category Organization** for logical grouping of related queries
-- **Version Control** of SQL changes alongside application code
+### Quick Start
+```bash
+# Run all tests
+run_tests.bat
 
-For detailed SQL architecture, see [backend/sql/README.md](backend/sql/README.md)
+# Run specific test categories  
+run_tests.bat quick        # Fast service layer tests
+run_tests.bat api          # API endpoint tests
+run_tests.bat db           # Database integration tests
+run_tests.bat web          # Web page tests
+run_tests.bat utils        # Utils function tests
+run_tests.bat upload       # Upload pipeline tests
+run_tests.bat coverage     # Generate coverage report
+```
 
-### Component System
-- **Self-contained Packages** with templates, styles, and behavior
-- **Auto-initialization** for immediate usability when included
-- **Simple APIs** through macros and JavaScript methods
-- **BEM CSS Methodology** for consistent styling
+### Test Categories & Coverage
+- **Service Layer Tests** (`tests/test_service_layer.py`) - Business logic contracts
+- **Utils Function Tests** (`tests/test_utils_functions.py`) - Data processing utilities
+- **Database Tests** (`tests/test_database_simple.py`) - SQL files and database operations  
+- **API Tests** (`tests/test_api_endpoints.py`) - HTTP endpoints and responses
+- **Upload Pipeline Tests** (`tests/test_upload_pipeline.py`) - Complete upload workflows
+- **Error Scenarios Tests** (`tests/test_error_scenarios.py`) - Edge cases and error handling
+- **Web Tests** (`tests/test_web_pages.py`) - Page rendering and navigation
 
-For component development, see [frontend/components/README.md](frontend/components/README.md)
+### Testing Philosophy
+The testing framework enables confident refactoring by:
+1. **Architecture Alignment**: Tests respect the service-oriented module hierarchy
+2. **Contract Focus**: Tests verify what functions return, not how they work
+3. **Fast Feedback**: Service layer tests run in <1 second for rapid development
+4. **Integration Coverage**: Database and API tests ensure components work together
+5. **Error Resilience**: Comprehensive error scenario testing
 
-### Layout System
-- **Component Orchestration** importing and configuring components for pages
-- **Template Composition** combining components into reusable patterns
-- **Configuration Management** for flexible navbar and component setup
+### Coverage Goals
+- **Current**: 51% overall coverage
+- **Target**: 75% overall coverage
+- **Priority Areas**: 
+  - `web_service.py`: 21% → 60%
+  - `api_service.py`: 50% → 65%
+  - `utils.py`: 36% → 55%
+  - `api_routes.py`: 40% → 70%
 
-For layout development, see [frontend/layouts/README.md](frontend/layouts/README.md)
-
-### Page System
-- **Business Logic Coordination** handling API calls and component interaction
-- **Error Handling Strategy** with user feedback and graceful degradation
-- **Performance Optimization** with lazy loading and memory management
-
-For page development, see [frontend/pages/README.md](frontend/pages/README.md)
+### Adding Tests
+See [tests/README.md](tests/README.md) for detailed guidance on:
+- When to add tests to each category
+- Test templates and examples
+- Best practices and troubleshooting
+- Integration with development workflow
 
 ## Features
 
@@ -206,43 +233,6 @@ For page development, see [frontend/pages/README.md](frontend/pages/README.md)
 - **Real-time Dashboards**: Grafana dashboards for operational insights
 - **Alerting**: Automated alerts for system health and performance issues
 
-## Testing
-
-The project includes a comprehensive testing framework for confident development and refactoring.
-
-### Quick Start
-```bash
-# Run all tests
-run_tests.bat
-
-# Run specific test categories  
-run_tests.bat quick        # Fast service layer tests
-run_tests.bat api          # API endpoint tests
-run_tests.bat db           # Database integration tests
-run_tests.bat web          # Web page tests
-run_tests.bat coverage     # Generate coverage report
-```
-
-### Test Categories
-- **Service Layer Tests** (`tests/test_service_layer.py`) - Business logic contracts
-- **Database Tests** (`tests/test_database_simple.py`) - SQL files and database operations  
-- **API Tests** (`tests/test_api_endpoints.py`) - HTTP endpoints and responses
-- **Web Tests** (`tests/test_web_pages.py`) - Page rendering and navigation
-
-### Adding Tests
-See [tests/README.md](tests/README.md) for detailed guidance on:
-- When to add tests to each category
-- Test templates and examples
-- Best practices and troubleshooting
-- Integration with development workflow
-
-### Test-Driven Development
-The testing framework enables confident refactoring:
-1. Tests pass = changes are safe
-2. Tests fail = contracts broken, fix needed  
-3. Add tests before new features
-4. Use `run_tests.bat quick` during development
-
 ## API Documentation
 
 ### Player Endpoints
@@ -261,44 +251,6 @@ The testing framework enables confident refactoring:
 ### Authentication
 All data modification endpoints require API key authentication via `X-API-Key` header.
 
-## Configuration
-
-### Development
-For development, the application uses sensible defaults. No additional configuration required.
-
-### Production
-Set environment variables for production deployment:
-```bash
-export FLASK_ENV=production
-export SECRET_KEY=your-secret-key
-export SLIPPI_REGISTRATION_SECRET=your-registration-secret
-export DATABASE_PATH=/path/to/production.db
-
-# Observability configuration
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://your-collector:4317
-export OTEL_SERVICE_NAME=slippi-stats-server
-export OTEL_ENVIRONMENT=production
-```
-
-### Observability Configuration
-```bash
-# Development with console output
-export OTEL_SERVICE_NAME=slippi-stats-server
-export OTEL_ENVIRONMENT=development
-
-# Production with OTLP collector
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://your-collector:4317
-export OTEL_RESOURCE_ATTRIBUTES=service.name=slippi-stats,environment=prod
-```
-
-## Database Schema
-- **clients**: Registered client applications with metadata
-- **games**: Individual game records with JSON player data  
-- **api_keys**: Authentication tokens for API access
-- **files**: Uploaded replay files with metadata and hash tracking
-
-All SQL queries are managed through external .sql files for better maintainability and version control.
-
 ## Development Status
 
 ### ✅ Completed
@@ -310,29 +262,19 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **File Upload System**: Secure upload and storage with deduplication
 - **Configuration Management**: Centralized with environment variable support
 - **Error Handling**: Comprehensive validation and user feedback
-- **Frontend Component System**: Self-contained packages with clear APIs
-- **Layout System**: Component orchestration and template composition
-- **Page System**: Business logic coordination and error handling
+- **Observability**: OpenTelemetry instrumentation and monitoring stack
+- **Testing Framework**: Architecture-aligned testing with multiple categories
 
 ### 🔄 In Progress
-- **Observability Implementation**: OpenTelemetry integration for comprehensive monitoring
+- **Test Coverage Improvement**: 51% → 75% coverage target
+- **Frontend Component System**: Migrating to component-based architecture
 - **Performance Optimization**: Database query optimization and caching
-- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
 
 ### 📋 Planned
-- **Observability Rollout**: 
-  - Phase 1: Core instrumentation and console output
-  - Phase 2: Local development stack with Jaeger and Prometheus
-  - Phase 3: Production deployment with OTLP collector
-  - Phase 4: Advanced dashboards, alerts, and SLA monitoring
+- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
 - **Export Features**: Statistics export and tournament bracket system
-- **Admin Interface**: Web-based administration panel with observability insights
+- **Admin Interface**: Web-based administration panel
 - **Database Migration System**: Versioned schema changes with rollback capability
-- **Advanced Monitoring**: 
-  - Business KPI tracking and alerting
-  - Performance regression detection
-  - Capacity planning and resource optimization
-  - Security monitoring and threat detection
 
 ## Contributing
 
@@ -341,9 +283,9 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **Routes**: Use blueprint organization with thin handlers delegating to services
 - **SQL**: Add new queries as external .sql files in appropriate categories
 - **Frontend**: Use the component-based architecture with self-contained packages
-- **Observability**: Add tracing decorators to new functions and metrics for business events
+- **Testing**: Add tests that align with the architectural boundaries
 - **Code Style**: Follow PEP 8 for Python, component patterns for frontend
-- **Testing**: Database functions should be testable with in-memory SQLite
+- **Observability**: Use tracing decorators and custom metrics for new features
 
 ### Getting Started
 1. Fork the repository
@@ -351,7 +293,7 @@ All SQL queries are managed through external .sql files for better maintainabili
 3. Set up development environment using `start_dev.bat` or manual setup
 4. Optional: Start observability stack with `docker-compose up -d`
 5. Make your changes following the architecture patterns
-6. Test your changes thoroughly
+6. Test your changes thoroughly using `run_tests.bat`
 7. Submit a pull request
 
 ### Architecture Documentation
@@ -362,6 +304,7 @@ All SQL queries are managed through external .sql files for better maintainabili
 - For component development: [frontend/components/README.md](frontend/components/README.md)
 - For layout development: [frontend/layouts/README.md](frontend/layouts/README.md)
 - For page development: [frontend/pages/README.md](frontend/pages/README.md)
+- For testing guidelines: [tests/README.md](tests/README.md)
 
 ### Adding New Features
 
@@ -371,6 +314,7 @@ All SQL queries are managed through external .sql files for better maintainabili
 3. Create template in `frontend/pages/`
 4. Add any new SQL queries to appropriate `backend/sql/` category
 5. Add observability decorators for tracing and metrics
+6. **Add tests**: Service layer contract test + web page rendering test
 
 #### New API Endpoint
 1. Add route to `backend/routes/api_routes.py` with `@trace_api_endpoint`
@@ -378,25 +322,64 @@ All SQL queries are managed through external .sql files for better maintainabili
 3. Add any new SQL queries to appropriate `backend/sql/` category
 4. Add metrics for business events and performance tracking
 5. Update API documentation
+6. **Add tests**: Service layer contract test + API endpoint test
 
 #### New Database Queries
 1. Create .sql file in appropriate `backend/sql/` category
 2. Use the query via `sql_manager.get_query()` in database functions
 3. Add `@trace_database_operation` decorator for performance monitoring
 4. No Python code changes needed - queries are discovered automatically
+5. **Add tests**: Database integration test for new query
 
 #### New Frontend Components
 1. Create component package in `frontend/components/`
 2. Follow the component development guide
 3. Add to layouts as needed
 4. Test component independence and reusability
+5. **Add tests**: Web page test for component integration
 
-#### Adding Observability
-1. Use `@trace_function` for business logic functions
-2. Use `@trace_database_operation` for database operations
-3. Use `@trace_api_endpoint` for API routes
-4. Record custom metrics with `observability.record_*()` methods
-5. Add custom spans for complex operations
+#### New Utility Functions
+1. Add function to `backend/utils.py`
+2. Follow the established patterns for data processing
+3. **Add tests**: Utils function test for new functionality
+
+### Test-Driven Development Workflow
+1. **Identify the change**: Determine which architectural layer is affected
+2. **Add service layer test**: If business logic is involved
+3. **Add integration test**: If database, API, or upload functionality is involved
+4. **Add utils test**: If data processing utilities are involved
+5. **Run quick tests**: `run_tests.bat quick` during development
+6. **Run full tests**: `run_tests.bat` before committing
+7. **Check coverage**: `run_tests.bat coverage` to ensure coverage goals
+
+### Junior Developer Guidance
+The architecture is designed to be approachable for junior developers:
+
+1. **Start with Service Layer**: Business logic is isolated and testable
+2. **Use Test Categories**: Clear guidelines on where to add tests
+3. **Follow Import Rules**: Strict hierarchy prevents architectural violations
+4. **Use Templates**: Provided templates for common development tasks
+5. **Quick Feedback**: Fast tests provide immediate validation
+6. **Documentation**: Comprehensive guides for each architectural layer
+
+## Configuration
+
+### Development
+For development, the application uses sensible defaults. No additional configuration required.
+
+### Production
+Set environment variables for production deployment:
+- `DATABASE_PATH`: Path to SQLite database file
+- `SECRET_KEY`: Flask secret key for session management
+- `API_KEY_LENGTH`: Length of generated API keys (default: 32)
+- `MAX_UPLOAD_SIZE`: Maximum upload size in bytes
+- `ENABLE_OBSERVABILITY`: Enable OpenTelemetry tracing (default: True)
+
+### Observability
+Configure observability stack:
+- `JAEGER_ENDPOINT`: Jaeger collector endpoint
+- `PROMETHEUS_ENDPOINT`: Prometheus metrics endpoint
+- `GRAFANA_ENDPOINT`: Grafana dashboard endpoint
 
 ## License
 
@@ -409,22 +392,8 @@ For issues, feature requests, or questions:
 2. Create a new issue with detailed description
 3. Follow the contributing guidelines for code submissions
 
-## Monitoring and Operations
-
-### Health Checks
-- Application health: `GET /api/stats`
-- Database connectivity: Automatic via SQLite instrumentation
-- File system access: Monitored via file upload metrics
-
-### Performance Monitoring
-- Request latency: Tracked automatically via OpenTelemetry
-- Database query performance: Monitored per query type
-- Business metrics: Games processed, files uploaded, API usage
-
-### Alerting (Planned)
-- High error rates (>5% for 5 minutes)
-- Slow database queries (>1s p95 for 5 minutes)
-- No data uploads (>1 hour without game uploads)
-- High memory usage (>80% for 10 minutes)
-
-This comprehensive architecture provides a scalable, maintainable foundation with enterprise-grade observability for monitoring, debugging, and optimizing the application in both development and production environments.
+### Development Support
+- **Architecture Questions**: See module-specific README files
+- **Testing Questions**: See [tests/README.md](tests/README.md)
+- **Component Development**: See [frontend/components/README.md](frontend/components/README.md)
+- **SQL Development**: See [backend/sql/README.md](backend/sql/README.md)

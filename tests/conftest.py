@@ -1,7 +1,3 @@
-# tests/conftest.py
-"""
-Simplified test configuration that works with your actual code structure.
-"""
 import pytest
 import tempfile
 import os
@@ -26,7 +22,7 @@ def test_db():
     # Create in-memory database
     test_db_manager = DatabaseManager(':memory:')
     
-    # Initialize the database with tables
+    # CRITICAL FIX: Actually initialize the database with tables
     test_db_manager.init_db()
     
     # Verify tables were created
@@ -34,7 +30,14 @@ def test_db():
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
-        print(f"[DEBUG] Test fixture created tables: {[table['name'] for table in tables]}")
+        table_names = [table['name'] for table in tables]
+        print(f"[DEBUG] Test fixture created tables: {table_names}")
+        
+        # Verify we have the expected tables
+        expected_tables = ['clients', 'games', 'api_keys', 'files']
+        for table in expected_tables:
+            if table not in table_names:
+                print(f"[WARNING] Expected table '{table}' not found in: {table_names}")
     
     # Patch the global db_manager to use our test database
     original_db_manager = backend.database.db_manager
@@ -86,47 +89,6 @@ def client(app):
     return app.test_client()
 
 @pytest.fixture
-def sample_game_data():
-    """Sample game data matching your client format"""
-    return {
-        'game_id': 'test_game_123',
-        'client_id': 'test_client',
-        'start_time': '2024-01-01T12:00:00Z',
-        'last_frame': 1000,
-        'stage_id': 31,  # Battlefield
-        'player_data': [
-            {
-                'port': 1,
-                'player_name': 'TestPlayer1',
-                'player_tag': 'TEST#123',
-                'character_name': 'Fox',
-                'result': 'Win'
-            },
-            {
-                'port': 2,
-                'player_name': 'TestPlayer2',
-                'player_tag': 'OPPO#456',
-                'character_name': 'Falco',
-                'result': 'Loss'
-            }
-        ],
-        'game_type': 'ranked'
-    }
-
-@pytest.fixture
-def valid_api_key(test_db):
-    """Create a valid API key for testing"""
-    from backend.database import create_client_record, create_api_key_record
-    
-    # Create test client
-    client_data = {
-        'client_id': 'test_client',
-        'hostname': 'test-host',
-        'platform': 'test-platform',
-        'version': '1.0.0'
-    }
-    create_client_record(client_data)
-    
-    # Create API key
-    api_data = create_api_key_record('test_client')
-    return api_data['api_key']
+def runner(app):
+    """Test runner for CLI commands"""
+    return app.test_cli_runner()

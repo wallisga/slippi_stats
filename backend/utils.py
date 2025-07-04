@@ -75,22 +75,16 @@ def get_error_template_data(status_code, error_description, **kwargs):
 # =============================================================================
 
 def parse_player_data_from_game(player_json_data):
-    """
-    Parse player data from JSON string to structured format.
-    
-    Args:
-        player_json_data (str): JSON string containing player data
-        
-    Returns:
-        list: List of parsed player dictionaries
-    """
+    """Parse player data from game JSON with None safety."""
     try:
+        if player_json_data is None:
+            return []  # Return empty list instead of None
         if isinstance(player_json_data, str):
             return json.loads(player_json_data)
         return player_json_data
     except (json.JSONDecodeError, TypeError) as e:
         logger.warning(f"Could not parse player data: {e}")
-        return []
+        return []  # Return empty list instead of None
 
 def find_player_in_game_data(parsed_players, target_player_tag):
     """
@@ -142,7 +136,7 @@ def calculate_win_rate(wins, total_games):
     Returns:
         float: Win rate as a decimal (0.0 to 1.0)
     """
-    if total_games <= 0:
+    if total_games is None or wins is None or total_games <= 0:
         return 0.0
     return wins / total_games
 
@@ -157,6 +151,9 @@ def process_raw_games_for_player(raw_games, target_player_tag):
     Returns:
         list: Processed game data for the specific player
     """
+    if raw_games is None:
+        return []  # Return empty list instead of trying to iterate None
+    
     processed_games = []
     
     for game in raw_games:
