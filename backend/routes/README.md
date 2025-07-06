@@ -1,189 +1,6 @@
-# Slippi Stats Server
+# Routes Architecture
 
-A comprehensive web application for collecting, storing, and analyzing Super Smash Bros. Melee game data from Slippi replays. Built with Flask and featuring a component-based frontend with real-time filtering and detailed player statistics.
-
-## Overview
-
-Slippi Stats Server provides:
-- **Player Profile Pages** with comprehensive statistics and performance analysis
-- **Advanced Filtering System** for detailed matchup and character analysis  
-- **Real-time Data Visualization** with interactive charts and tables
-- **RESTful API** for programmatic access to game data
-- **Client Registration System** for automated replay collection
-
-## Quick Start
-
-### Prerequisites
-- Python 3.8+
-- SQLite 3 (included with Python)
-- Modern web browser with JavaScript enabled
-- Git (for development)
-
-### Windows Development Setup
-```cmd
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
-
-# Run the Windows setup script
-start_dev.bat
-```
-
-The development server will be available at: http://127.0.0.1:5000
-
-### Manual Setup (All Platforms)
-```bash
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run development server
-python app.py
-```
-
-## Project Structure
-
-```
-slippi_stats/
-├── README.md                    # This file - project overview
-├── requirements.txt             # Python dependencies
-├── start_dev.bat               # Windows development script
-├── app.py                      # Flask application entry point (lightweight)
-├── backend/                    # Backend modules
-│   ├── README.md              # Backend architecture details
-│   ├── config.py              # Configuration management
-│   ├── database.py            # Data access layer with external SQL
-│   ├── sql_manager.py         # Dynamic SQL file management
-│   ├── sql/                   # External SQL files organized by category
-│   │   ├── schema/            # Database schema and indexes
-│   │   ├── games/             # Game-related queries
-│   │   ├── clients/           # Client management queries
-│   │   ├── api_keys/          # Authentication queries
-│   │   ├── files/             # File storage queries
-│   │   └── stats/             # Statistics and reporting queries
-│   ├── routes/                # Flask route blueprints
-│   │   ├── README.md          # Routes architecture details
-│   │   ├── __init__.py        # Blueprint registration
-│   │   ├── web_routes.py      # HTML page routes
-│   │   ├── api_routes.py      # JSON API routes
-│   │   ├── static_routes.py   # File serving routes
-│   │   └── error_handlers.py  # HTTP error handlers
-│   ├── web_service.py         # Web page business logic
-│   ├── api_service.py         # API business logic
-│   └── utils.py               # Shared utilities
-└── frontend/                  # Component-based frontend
-    ├── README.md              # Frontend architecture details
-    ├── base.html              # Foundation template
-    ├── base.css               # Global styles
-    ├── base.js                # Global utilities
-    ├── components/            # Self-contained UI components
-    ├── layouts/               # Component orchestration
-    └── pages/                 # Page-specific content
-```
-
-## Architecture
-
-This project follows a **modular architecture** with clear separation of concerns:
-
-### Backend Architecture
-- **Lightweight Flask App** with application factory pattern
-- **Blueprint-based Routing** organized by functionality (web, api, static, errors)
-- **Service-oriented Business Logic** separated into web and API services
-- **External SQL Management** with dynamic query discovery and template support
-- **Pure Data Access Layer** with no business logic mixing
-
-For detailed backend architecture, see [backend/README.md](backend/README.md)
-
-### Frontend Architecture
-- **Component-based Design** with self-contained packages
-- **Template Inheritance** following base → layout → page pattern
-- **Asset Management** where components own their CSS/JS
-- **Bootstrap Integration** with modern responsive design
-
-For detailed frontend architecture, see [frontend/README.md](frontend/README.md)
-
-### Routes Architecture
-- **Blueprint Organization** separating web pages, API endpoints, and static files
-- **Thin Route Handlers** with business logic delegated to service layers
-- **Authentication & Rate Limiting** implemented as decorators
-- **Comprehensive Error Handling** with user-friendly error pages
-
-For detailed routes architecture, see [backend/routes/README.md](backend/routes/README.md)
-
-## Features
-
-### Player Analytics
-- **Basic Profiles**: Win rates, character usage, recent games, performance highlights
-- **Detailed Analysis**: Advanced filtering by character, opponent, and matchup
-- **Performance Trends**: Time-series charts showing improvement over time
-- **Character Statistics**: Win rates and usage patterns for each character
-- **Rival Detection**: Identifies frequent opponents and challenging matchups
-
-### Data Management
-- **Automated Collection**: Client applications upload replay data automatically
-- **File Upload System**: Secure upload and storage of .slp replay files
-- **API Authentication**: Secure API key system for client access
-- **Flexible Storage**: SQLite database with external SQL file management
-- **Data Validation**: Comprehensive validation and error handling
-
-### User Experience
-- **Responsive Design**: Bootstrap-based UI that works on all devices
-- **Character Icons**: Visual character representations throughout the interface
-- **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
-- **Smart Search**: Flexible player search with case-insensitive matching
-- **Error Handling**: User-friendly error pages with helpful navigation
-
-## API Documentation
-
-### Player Endpoints
-- `GET /api/player/{code}/stats` - Basic player statistics
-- `GET /api/player/{code}/games` - Paginated game history
-- `POST /api/player/{code}/detailed` - Advanced filtering and analysis
-
-### Data Endpoints  
-- `POST /api/games/upload` - Upload game data (supports legacy and combined formats)
-- `POST /api/files/upload` - Upload replay files with metadata
-- `GET /api/files` - List uploaded files
-- `GET /api/files/{id}` - Get file details
-- `GET /api/stats` - Server statistics and health
-- `POST /api/clients/register` - Client registration
-
-### Authentication
-All data modification endpoints require API key authentication via `X-API-Key` header.
-
-## Configuration
-
-### Development
-For development, the application uses sensible defaults. No additional configuration required.
-
-### Production
-Set environment variables for production deployment:
-```bash
-export FLASK_ENV=production
-export SECRET_KEY=your-secret-key
-export SLIPPI_REGISTRATION_SECRET=your-registration-secret
-export DATABASE_PATH=/path/to/production.db
-```
-
-## Database Schema
-- **clients**: Registered client applications with metadata
-- **games**: Individual game records with JSON player data  
-- **api_keys**: Authentication tokens for API access
-- **files**: Uploaded replay files with metadata and hash tracking
-
-All SQL queries are managed through external .sql files for better maintainability and version control.
+This directory contains Flask route blueprints that handle HTTP requests and responses. Routes follow the **"Routes Delegate"** principle - they are thin controllers that validate input and delegate business logic to service layers.
 
 ## Development Status
 
@@ -196,9 +13,11 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **File Upload System**: Secure upload and storage with deduplication
 - **Configuration Management**: Centralized with environment variable support
 - **Error Handling**: Comprehensive validation and user feedback
+- **Observability**: OpenTelemetry instrumentation and monitoring stack
+- **Testing Framework**: Architecture-aligned testing with multiple categories
 
 ### 🔄 In Progress
-- **Frontend Component System**: Migrating to component-based architecture
+- **Test Coverage Improvement**: 51% → 75% coverage target
 - **Performance Optimization**: Database query optimization and caching
 
 ### 📋 Planned
@@ -207,28 +26,270 @@ All SQL queries are managed through external .sql files for better maintainabili
 - **Admin Interface**: Web-based administration panel
 - **Database Migration System**: Versioned schema changes with rollback capability
 
+## Architecture Overview
+
+Routes are organized into focused blueprints with clear responsibilities:
+
+```
+backend/routes/
+├── __init__.py           # Blueprint registration
+├── web_routes.py         # HTML page routes
+├── api_routes.py         # JSON API routes  
+├── static_routes.py      # File serving routes
+└── error_handlers.py     # HTTP error handlers
+```
+
+## Core Principle: Routes Delegate
+
+Routes should be **thin controllers** that:
+- **✅ Validate input parameters** and request format
+- **✅ Delegate to service layers** for business logic
+- **✅ Handle authentication and authorization** 
+- **✅ Format responses consistently** (HTML templates or JSON)
+- **✅ Provide observability** through tracing decorators
+- **❌ NOT contain business logic** - delegate to services
+- **❌ NOT access database directly** - use service layer
+- **❌ NOT process complex data** - use utils via services
+
+## Blueprint Organization
+
+### Web Routes (`web_routes.py`)
+**Purpose**: HTML page endpoints for user interface
+
+**Characteristics**:
+- Render Jinja2 templates with context data
+- Delegate to `web_service.py` for business logic
+- Handle user-facing error scenarios gracefully
+- Use `@trace_endpoint` for observability
+
+**Example Pattern**:
+```python
+@web_bp.route('/player/<encoded_player_code>')
+@trace_endpoint
+def player_profile(encoded_player_code):
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+        context_data = web_service.get_player_profile_context(player_code)
+        return render_template('pages/player/player.html', **context_data)
+    except Exception as e:
+        logger.error(f"Error loading player profile: {str(e)}")
+        return render_template('pages/error/error.html'), 500
+```
+
+### API Routes (`api_routes.py`)
+**Purpose**: JSON API endpoints for programmatic access
+
+**Characteristics**:
+- Return structured JSON responses
+- Delegate to `api_service.py` for business logic
+- Require API key authentication for data modification
+- Use `@trace_api_endpoint` for observability
+- Handle rate limiting and error responses consistently
+
+**Example Pattern**:
+```python
+@api_bp.route('/player/<encoded_player_code>/stats')
+@trace_api_endpoint
+def api_player_stats(encoded_player_code):
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+        stats_data = api_service.get_player_basic_stats(player_code)
+        return jsonify({
+            'player_code': player_code,
+            'stats': stats_data
+        })
+    except Exception as e:
+        logger.error(f"API error for player stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+```
+
+### Static Routes (`static_routes.py`)
+**Purpose**: File serving and download endpoints
+
+**Characteristics**:
+- Serve uploaded replay files securely
+- Handle file download with proper headers
+- Validate file access permissions
+- Support range requests for large files
+
+### Error Handlers (`error_handlers.py`)
+**Purpose**: Centralized HTTP error response handling
+
+**Characteristics**:
+- Consistent error page rendering
+- Structured error logging
+- User-friendly error messages
+- Proper HTTP status codes
+
+## Development Guidelines
+
+### Adding New Routes
+
+#### New Web Page Route
+1. **Add route to `web_routes.py`** with descriptive endpoint name
+2. **Add business logic to `backend/web_service.py`** following existing patterns
+3. **Create page template** in `frontend/pages/` extending appropriate layout
+4. **Add SQL queries** to appropriate `backend/sql/` category if needed
+5. **Add observability decorators** for tracing and metrics
+6. **Add tests**: Service layer contract test + web page rendering test
+
+#### New API Endpoint Route
+1. **Add route to `api_routes.py`** with `@trace_api_endpoint` decorator
+2. **Add business logic to `backend/api_service.py`** with `@trace_function` decorator
+3. **Add SQL queries** to appropriate `backend/sql/` category if needed
+4. **Add authentication** if endpoint modifies data (`@require_api_key`)
+5. **Update API documentation** in main README.md
+6. **Add tests**: Service layer contract test + API endpoint test
+
+### Route Handler Patterns
+
+#### Input Validation
+```python
+@web_bp.route('/player/<encoded_player_code>/detailed')
+def player_detailed(encoded_player_code):
+    # Validate and decode parameters
+    try:
+        player_code = decode_player_tag(encoded_player_code)
+    except ValueError:
+        abort(400, "Invalid player code format")
+    
+    # Get optional parameters with defaults
+    character = request.args.get('character', 'all')
+    limit = int(request.args.get('limit', '50'))
+    
+    # Delegate to service layer
+    context_data = web_service.get_detailed_player_analysis(
+        player_code, character, limit
+    )
+    return render_template('pages/player_detailed/player_detailed.html', **context_data)
+```
+
+#### Error Handling
+```python
+@api_bp.route('/games/upload', methods=['POST'])
+@require_api_key
+@trace_api_endpoint
+def upload_games(client_id):
+    try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 400
+        
+        games_data = request.get_json()
+        if not isinstance(games_data, list):
+            return jsonify({'error': 'Games data must be a list'}), 400
+        
+        # Delegate to service layer
+        result = api_service.upload_games_for_client(client_id, games_data)
+        
+        return jsonify(result), 200 if result['success'] else 400
+        
+    except Exception as e:
+        logger.error(f"Error uploading games for client {client_id}: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+```
+
+#### Authentication Decorators
+```python
+@api_bp.route('/protected-endpoint')
+@require_api_key
+@trace_api_endpoint
+def protected_endpoint(client_id):
+    # client_id is automatically provided by @require_api_key decorator
+    result = api_service.process_authenticated_request(client_id)
+    return jsonify(result)
+```
+
+### Observability Integration
+
+All routes should include appropriate observability:
+
+```python
+from backend.observability import trace_endpoint, trace_api_endpoint
+
+# Web routes
+@trace_endpoint
+def web_handler():
+    pass
+
+# API routes  
+@trace_api_endpoint
+def api_handler():
+    pass
+```
+
+## Testing Strategy
+
+### Route Testing
+Routes are tested via HTTP requests using Flask test client:
+
+```python
+def test_player_profile_route(client):
+    """Test player profile page renders correctly"""
+    response = client.get('/player/TEST%23123')
+    assert response.status_code == 200
+    assert b'Player Profile' in response.data
+
+def test_api_player_stats(client):
+    """Test API player stats endpoint"""
+    response = client.get('/api/player/TEST%23123/stats')
+    assert response.status_code == 200
+    
+    data = response.get_json()
+    assert 'player_code' in data
+    assert 'stats' in data
+```
+
+## Import Rules
+
+Routes can import:
+- ✅ **Service modules**: `web_service`, `api_service`
+- ✅ **Utilities**: `utils` functions for common operations
+- ✅ **Configuration**: `config` for application settings
+- ✅ **Flask components**: `render_template`, `jsonify`, `abort`, etc.
+- ✅ **Observability**: Tracing decorators and logging
+
+Routes should NOT import:
+- ❌ **Database directly**: Use service layer instead
+- ❌ **SQL manager**: Database access through services only
+- ❌ **Other route modules**: Keep blueprints independent
+
+## Blueprint Registration
+
+All blueprints are registered in `__init__.py`:
+
+```python
+from .web_routes import web_bp
+from .api_routes import api_bp
+from .static_routes import static_bp
+from .error_handlers import register_error_handlers
+
+def register_blueprints(app):
+    """Register all blueprints with the Flask application."""
+    app.register_blueprint(web_bp)
+    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(static_bp)
+    register_error_handlers(app)
+```
+
 ## Contributing
 
 ### Development Guidelines
-- **Backend**: Follow the established service layer pattern and module import hierarchy
 - **Routes**: Use blueprint organization with thin handlers delegating to services
+- **Business Logic**: Delegate to `web_service.py` or `api_service.py`
 - **SQL**: Add new queries as external .sql files in appropriate categories
-- **Frontend**: Use the component-based architecture with self-contained packages
-- **Code Style**: Follow PEP 8 for Python, component patterns for frontend
-- **Testing**: Database functions should be testable with in-memory SQLite
-
-### Getting Started
-1. Fork the repository
-2. Create a feature branch
-3. Set up development environment using `start_dev.bat` or manual setup
-4. Make your changes following the architecture patterns
-5. Test your changes thoroughly
-6. Submit a pull request
+- **Testing**: Add both service layer and HTTP endpoint tests
+- **Observability**: Use tracing decorators and structured logging
 
 ### Architecture Documentation
-- For backend development details: [backend/README.md](backend/README.md)
-- For routes development details: [backend/routes/README.md](backend/routes/README.md)
-- For frontend development details: [frontend/README.md](frontend/README.md)
+- For backend development details: [backend/README.md](../README.md)
+- For SQL query management: [backend/sql/README.md](../sql/README.md)
+- For frontend development details: [frontend/README.md](../../frontend/README.md)
+- For component development: [frontend/components/README.md](../../frontend/components/README.md)
+- For layout development: [frontend/layouts/README.md](../../frontend/layouts/README.md)
+- For page development: [frontend/pages/README.md](../../frontend/pages/README.md)
+- For testing guidelines: [tests/README.md](../../tests/README.md)
+- For high-level architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 
 ### Adding New Features
 
