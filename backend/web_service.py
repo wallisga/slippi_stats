@@ -16,16 +16,9 @@ from backend.database import (
     get_games_all, get_games_recent, get_database_stats
 )
 
-import logging
-from backend.logging_utils import (
-    log_function_execution, 
-    get_structured_logger, 
-    log_business_event,
-    log_performance_metric
-)
-
-# Replace the existing logger line
-logger = get_structured_logger('web_service')
+# Get configuration and logger
+config = get_config()
+logger = config.init_logging()
 
 # =============================================================================
 # Statistics Functions (Shared between web and API)
@@ -167,148 +160,41 @@ def find_player_matches(player_code):
         logger.error(f"Error finding matches for player {player_code}: {str(e)}")
         return []
 
-@log_function_execution(log_level=logging.INFO)
 def get_recent_games(limit=10):
-    """Get recent games for homepage display with structured logging."""
-    logger.debug("Getting recent games", extra={
-        "source_function": "get_recent_games",
-        "source_module": "web_service",
-        "context": {"limit": limit}
-    })
-    
+    """Get recent games for homepage display."""
     try:
         # Get recent raw games from database
         raw_games = get_games_recent(limit * 2)  # Get more than needed in case some are filtered out
-        
-        logger.debug("Raw games retrieved from database", extra={
-            "source_function": "get_recent_games",
-            "source_module": "web_service",
-            "context": {
-                "raw_games_count": len(raw_games),
-                "requested_limit": limit
-            }
-        })
-        
         # Process them for display
-        processed_games = process_recent_games_data(raw_games, limit)
-        
-        logger.info("Recent games processed", extra={
-            "source_function": "get_recent_games",
-            "source_module": "web_service",
-            "context": {
-                "processed_games_count": len(processed_games),
-                "limit": limit
-            }
-        })
-        
-        return processed_games
-        
+        return process_recent_games_data(raw_games, limit)
     except Exception as e:
-        logger.error("Error getting recent games", extra={
-            "source_function": "get_recent_games",
-            "source_module": "web_service",
-            "error_code": "RECENT_GAMES_ERROR",
-            "context": {
-                "limit": limit,
-                "exception_message": str(e)
-            }
-        })
+        logger.error(f"Error getting recent games: {str(e)}")
         return []
 
-@log_function_execution(log_level=logging.INFO)
 def get_top_players(limit=10):
-    """Get top players by win rate with structured logging."""
-    logger.debug("Getting top players", extra={
-        "source_function": "get_top_players",
-        "source_module": "web_service",
-        "context": {"limit": limit}
-    })
-    
+    """Get top players by win rate."""
     try:
         # Get all games from database
         raw_games = get_games_all()
-        
-        logger.debug("Raw games retrieved for player stats", extra={
-            "source_function": "get_top_players",
-            "source_module": "web_service",
-            "context": {
-                "raw_games_count": len(raw_games),
-                "limit": limit
-            }
-        })
-        
         # Extract player stats
-        top_players, all_players = extract_player_stats_from_games(raw_games)
-        top_players_limited = top_players[:limit]
-        
-        logger.info("Top players calculated", extra={
-            "source_function": "get_top_players",
-            "source_module": "web_service",
-            "context": {
-                "top_players_returned": len(top_players_limited),
-                "total_qualified_players": len(top_players),
-                "total_players": len(all_players),
-                "limit": limit
-            }
-        })
-        
-        # Log performance metric
-        log_performance_metric('top_players_calculation', 
-                             len(top_players_limited), 
-                             'players', 
-                             limit=limit)
-        
-        return top_players_limited
-        
+        top_players, _ = extract_player_stats_from_games(raw_games)
+        return top_players[:limit]
     except Exception as e:
-        logger.error("Error getting top players", extra={
-            "source_function": "get_top_players",
-            "source_module": "web_service",
-            "error_code": "TOP_PLAYERS_ERROR",
-            "context": {
-                "limit": limit,
-                "exception_message": str(e)
-            }
-        })
+        logger.error(f"Error getting top players: {str(e)}")
         return []
 
-@log_function_execution(log_level=logging.INFO)
 def get_all_players():
-    """Get all players with their stats with structured logging."""
-    logger.debug("Getting all players", extra={
-        "source_function": "get_all_players",
-        "source_module": "web_service"
-    })
-    
+    """Get all players with their stats."""
     try:
         # Get all games from database
         raw_games = get_games_all()
-        
-        logger.debug("Raw games retrieved for all players", extra={
-            "source_function": "get_all_players",
-            "source_module": "web_service",
-            "context": {"raw_games_count": len(raw_games)}
-        })
-        
         # Extract all player stats
         _, all_players = extract_player_stats_from_games(raw_games)
-        
-        logger.info("All players data prepared", extra={
-            "source_function": "get_all_players",
-            "source_module": "web_service",
-            "context": {"total_players": len(all_players)}
-        })
-        
         return all_players
-        
     except Exception as e:
-        logger.error("Error getting all players", extra={
-            "source_function": "get_all_players",
-            "source_module": "web_service",
-            "error_code": "ALL_PLAYERS_ERROR",
-            "context": {"exception_message": str(e)}
-        })
+        logger.error(f"Error getting all players: {str(e)}")
         return []
+
 # =============================================================================
 # Template Data Preparation Functions
 # =============================================================================
@@ -337,85 +223,24 @@ def prepare_standard_player_template_data(player_code, encoded_player_code):
         'all_games': games, 'last_game_date': recent_games[0]['start_time'] if recent_games else None
     }
 
-@log_function_execution(log_level=logging.INFO, include_args=False)
 def prepare_homepage_data():
-    """Prepare data for homepage template with enhanced logging."""
-    logger.info("Preparing homepage data", extra={
-        "source_function": "prepare_homepage_data",
-        "source_module": "web_service"
-    })
+    stats = get_database_stats()
     
-    try:
-        stats = get_database_stats()
-        recent_games = get_recent_games(10)
-        top_players = get_top_players(6)
-        
-        homepage_data = {
-            'total_games': stats.get('total_games', 0),
-            'total_players': stats.get('unique_players', 0),
-            'recent_games': recent_games,
-            'top_players': top_players
-        }
-        
-        logger.info("Homepage data prepared successfully", extra={
-            "source_function": "prepare_homepage_data",
-            "source_module": "web_service",
-            "context": {
-                "total_games": homepage_data['total_games'],
-                "total_players": homepage_data['total_players'],
-                "recent_games_count": len(recent_games),
-                "top_players_count": len(top_players)
-            }
-        })
-        
-        # Log business event for analytics
-        log_business_event('homepage_data_prepared',
-                          total_games=homepage_data['total_games'],
-                          total_players=homepage_data['total_players'])
-        
-        return homepage_data
-        
-    except Exception as e:
-        logger.error("Failed to prepare homepage data", extra={
-            "source_function": "prepare_homepage_data",
-            "source_module": "web_service",
-            "error_code": "HOMEPAGE_DATA_ERROR",
-            "context": {"exception_message": str(e)}
-        })
-        raise
+    # No more renaming or duplication needed!
+    return {
+        'total_games': stats.get('total_games', 0),      # Direct pass-through
+        'total_players': stats.get('unique_players', 0),  # Direct pass-through
+        'recent_games': get_recent_games(10),
+        'top_players': get_top_players(6)
+    }
 
-@log_function_execution(log_level=logging.INFO)
 def prepare_all_players_data():
-    """Get all players data for the players index page with structured logging."""
-    logger.info("Preparing all players data", extra={
-        "source_function": "prepare_all_players_data",
-        "source_module": "web_service"
-    })
-    
+    """Get all players data for the players index page."""
     try:
         players_list = get_all_players()
-        
-        result = {'players': players_list}
-        
-        logger.info("All players data prepared successfully", extra={
-            "source_function": "prepare_all_players_data",
-            "source_module": "web_service",
-            "context": {"players_count": len(players_list)}
-        })
-        
-        # Log business event
-        log_business_event('all_players_data_prepared', 
-                          players_count=len(players_list))
-        
-        return result
-        
+        return {'players': players_list}
     except Exception as e:
-        logger.error("Error getting all players data", extra={
-            "source_function": "prepare_all_players_data",
-            "source_module": "web_service",
-            "error_code": "ALL_PLAYERS_DATA_ERROR",
-            "context": {"exception_message": str(e)}
-        })
+        logger.error(f"Error getting all players data: {str(e)}")
         return {'players': []}
 
 # =============================================================================
