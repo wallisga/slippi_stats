@@ -14,7 +14,7 @@ class TestUploadPipelineIntegration:
     
     def test_game_data_upload_workflow(self, test_db):
         """Test complete game data upload from client to database"""
-        from backend.api_service import upload_games_for_client
+        from backend.services.api_service import upload_games_for_client
         
         # Setup test client
         client_id = "test_client_123"
@@ -47,7 +47,7 @@ class TestUploadPipelineIntegration:
     
     def test_file_upload_workflow(self, test_db):
         """Test file upload with correct data format"""
-        from backend.api_service import process_file_upload
+        from backend.services.api_service import process_file_upload
         
         # Create temporary test file
         with tempfile.NamedTemporaryFile(suffix='.slp', delete=False) as tmp_file:
@@ -74,7 +74,7 @@ class TestUploadPipelineIntegration:
     
     def test_client_registration_workflow(self, test_db):
         """Test client registration and API key generation"""
-        from backend.api_service import register_or_update_client
+        from backend.services.api_service import register_or_update_client
         
         # Test client data
         client_data = {
@@ -100,7 +100,7 @@ class TestUploadPipelineIntegration:
     
     def test_upload_error_handling(self, test_db):
         """Test upload error scenarios handled gracefully"""
-        from backend.api_service import upload_games_for_client
+        from backend.services.api_service import upload_games_for_client
         
         # Test with invalid game data (missing required fields)
         invalid_games = [

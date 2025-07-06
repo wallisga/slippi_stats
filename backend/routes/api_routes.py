@@ -14,7 +14,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from backend.config import get_config
 from backend.utils import decode_player_tag
 from backend.database import validate_api_key, get_files_by_client, get_file_by_id, get_enhanced_database_stats
-import backend.api_service as api_service
+import backend.services.api_service as api_service
 
 # Create blueprint for API routes
 api_bp = Blueprint('api', __name__)
@@ -137,57 +137,51 @@ def clients_register():
 @rate_limited(config.RATE_LIMIT_UPLOADS)
 def games_upload(client_id):
     """
-    Games upload endpoint that supports both legacy format and new combined format.
+    Combined games and files upload endpoint.
     
-    Legacy format: {"client_id": "...", "games": [...]}
-    New format: {"client_id": "...", "games": [...], "files": [...]}
+    Supports both:
+    - Legacy format: {"games": [...]}
+    - Combined format: {"games": [...], "files": [...]}
     """
     try:
-        upload_data = request.json
-        if not upload_data:
-            abort(400, description="No upload data provided")
-        
-        # Check if this is the new combined format (has files) or legacy format
-        if 'files' in upload_data and upload_data['files']:
-            # New combined format
-            result = api_service.process_combined_upload(client_id, upload_data)
-        else:
-            # Legacy format - just process games
-            result = api_service.process_games_upload(client_id, upload_data)
-        
+        upload_data = _validate_upload_request()
+        result = api_service.process_combined_upload(client_id, upload_data)
         return jsonify(result)
         
-    except RequestEntityTooLarge:
-        abort(413, description="Upload too large")
-    except ValueError as e:
-        abort(400, description=str(e))
+    except (RequestEntityTooLarge, ValueError) as e:
+        return _handle_upload_error(e)
     except Exception as e:
-        logger.error(f"Error in enhanced games upload API: {str(e)}")
-        abort(500, description=f"Server error: {str(e)}")
+        logger.error(f"Unexpected error in games upload: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @api_bp.route('/files/upload', methods=['POST'])
-@require_api_key
+@require_api_key  
 @rate_limited(config.RATE_LIMIT_UPLOADS)
 def files_upload(client_id):
     """
-    Upload files with metadata.
-    Expects JSON payload with files data including base64 encoded content.
+    Files upload endpoint - delegates to combined upload.
+    
+    This endpoint exists for API consistency but uses the same
+    combined upload logic internally.
     """
     try:
-        upload_data = request.json
-        if not upload_data:
-            abort(400, description="No upload data provided")
+        upload_data = _validate_upload_request()
+        
+        # Ensure files are present for files-only endpoint
+        if not upload_data.get('files'):
+            return jsonify({'error': 'No files provided'}), 400
+        
+        # Add empty games array if not present
+        upload_data.setdefault('games', [])
         
         result = api_service.process_combined_upload(client_id, upload_data)
         return jsonify(result)
         
-    except RequestEntityTooLarge:
-        abort(413, description="File too large")
-    except ValueError as e:
-        abort(400, description=str(e))
+    except (RequestEntityTooLarge, ValueError) as e:
+        return _handle_upload_error(e)
     except Exception as e:
-        logger.error(f"Error in file upload API: {str(e)}")
-        abort(500, description=f"Server error: {str(e)}")
+        logger.error(f"Unexpected error in files upload: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 # =============================================================================
 # File Management Endpoints
@@ -278,3 +272,27 @@ def admin_file_stats():
     except Exception as e:
         logger.error(f"Error getting file stats: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+# ============================================================================
+# Route Helper Functions
+# ============================================================================
+
+def _validate_upload_request():
+    """Validate upload request data."""
+    if not request.is_json:
+        raise ValueError("Content-Type must be application/json")
+    
+    upload_data = request.get_json()
+    if not upload_data:
+        raise ValueError("No upload data provided")
+    
+    return upload_data
+
+def _handle_upload_error(error):
+    """Handle upload errors with appropriate HTTP responses."""
+    if isinstance(error, RequestEntityTooLarge):
+        return jsonify({'error': 'Upload too large'}), 413
+    elif isinstance(error, ValueError):
+        return jsonify({'error': str(error)}), 400
+    else:
+        return jsonify({'error': 'Internal server error'}), 500

@@ -13,7 +13,7 @@ class TestServiceContracts:
     
     def test_api_service_player_stats_returns_none_for_no_data(self):
         """API service should return None when no player data exists"""
-        import backend.api_service as api_service
+        import backend.services.api_service as api_service
         
         # Test with non-existent player
         result = api_service.process_player_basic_stats('NONEXISTENT#123')
@@ -21,7 +21,7 @@ class TestServiceContracts:
     
     def test_api_service_server_stats_structure(self):
         """Server stats should always return expected structure"""
-        import backend.api_service as api_service
+        import backend.services.api_service as api_service
         
         result = api_service.process_server_statistics()
         assert isinstance(result, dict)
@@ -31,7 +31,7 @@ class TestServiceContracts:
     
     def test_web_service_homepage_data_structure(self):
         """Homepage data should have consistent structure"""
-        import backend.web_service as web_service
+        import backend.services.web_service as web_service
         
         result = web_service.prepare_homepage_data()
         assert isinstance(result, dict)
@@ -56,7 +56,7 @@ class TestUploadServiceContracts:
     
     def test_upload_functions_exist_and_callable(self):
         """Test upload functions exist and are callable"""
-        from backend.api_service import (
+        from backend.services.api_service import (
             upload_games_for_client,
             process_combined_upload,
             register_or_update_client,
@@ -71,7 +71,7 @@ class TestUploadServiceContracts:
     
     def test_upload_function_signatures(self):
         """Test upload functions have expected signatures"""
-        from backend.api_service import (
+        from backend.services.api_service import (
             upload_games_for_client,
             process_combined_upload,
             register_or_update_client,
@@ -93,7 +93,7 @@ class TestUploadServiceContracts:
 
     def test_file_upload_helper_functions(self):
         """Test file upload helper functions"""
-        from backend.api_service import allowed_file, calculate_file_hash
+        from backend.services.api_service import allowed_file, calculate_file_hash
         
         # Test allowed_file function
         assert allowed_file('test.slp') is True
@@ -194,7 +194,7 @@ class TestWebServiceContracts:
     
     def test_web_service_functions_callable(self):
         """Test web service functions are accessible"""
-        import backend.web_service as web_service
+        import backend.services.web_service as web_service
         
         # Test key functions exist
         assert callable(web_service.prepare_homepage_data)
@@ -204,7 +204,7 @@ class TestWebServiceContracts:
     
     def test_web_service_data_structures(self):
         """Test web service returns expected data structures"""
-        import backend.web_service as web_service
+        import backend.services.web_service as web_service
         
         # Test homepage data structure
         homepage_data = web_service.prepare_homepage_data()
@@ -320,7 +320,7 @@ class TestServiceIntegration:
 
     def test_service_layer_error_handling(self):
         """Test service layer functions handle errors gracefully"""
-        import backend.api_service as api_service
+        import backend.services.api_service as api_service
         
         # Test functions don't crash with invalid input
         try:
@@ -342,7 +342,7 @@ class TestWebServiceDataPreparation:
     
     def test_prepare_homepage_data_structure(self):
         """Test homepage data contains all required template fields"""
-        from backend.web_service import prepare_homepage_data
+        from backend.services.web_service import prepare_homepage_data
         
         result = prepare_homepage_data()
         assert isinstance(result, dict)
@@ -362,7 +362,7 @@ class TestWebServiceDataPreparation:
     
     def test_prepare_all_players_data_structure(self):
         """Test all players data contains player list and metadata"""
-        from backend.web_service import prepare_all_players_data
+        from backend.services.web_service import prepare_all_players_data
         
         result = prepare_all_players_data()
         assert isinstance(result, dict)
@@ -373,7 +373,7 @@ class TestWebServiceDataPreparation:
     
     def test_prepare_player_template_data_structure(self):
         """Test player template data - CORRECTED for actual function signature"""
-        from backend.web_service import prepare_standard_player_template_data
+        from backend.services.web_service import prepare_standard_player_template_data
         
         # Test with both required parameters
         try:
@@ -389,7 +389,7 @@ class TestWebServiceRequestProcessing:
     
     def test_process_player_profile_request_nonexistent_player(self):
         """Test nonexistent player - CORRECTED for actual behavior"""
-        from backend.web_service import process_player_profile_request
+        from backend.services.web_service import process_player_profile_request
         
         # This function actually aborts with 404, which is correct behavior
         # We'll test that it handles the request properly
@@ -404,7 +404,7 @@ class TestWebServiceRequestProcessing:
     
     def test_process_player_detailed_request_with_filters(self):
         """Test detailed request - CORRECTED for actual function signature"""
-        from backend.web_service import process_player_detailed_request
+        from backend.services.web_service import process_player_detailed_request
         
         # This function only takes one parameter (encoded_player_code)
         try:
@@ -422,7 +422,7 @@ class TestAPIServiceUploadLogic:
     
     def test_process_combined_upload_structure(self):
         """Test combined upload returns success/error structure"""
-        from backend.api_service import process_combined_upload
+        from backend.services.api_service import process_combined_upload
         
         # Test with empty data
         result = process_combined_upload("test_client", {})
@@ -436,7 +436,7 @@ class TestAPIServiceUploadLogic:
     
     def test_upload_games_for_client_validation(self):
         """Test games upload validates data structure - CORRECTED"""
-        from backend.api_service import upload_games_for_client
+        from backend.services.api_service import upload_games_for_client
         
         # Test with valid empty list
         result = upload_games_for_client("test_client", [])
@@ -455,7 +455,7 @@ class TestAPIServiceUploadLogic:
     
     def test_register_or_update_client_logic(self):
         """Test client registration processes data correctly"""
-        from backend.api_service import register_or_update_client
+        from backend.services.api_service import register_or_update_client
         
         # Test with valid client data
         client_data = {"client_id": "test_client", "name": "Test Client"}
@@ -469,7 +469,7 @@ class TestAPIServiceFilteringLogic:
     
     def test_apply_game_filters_character_filtering(self):
         """Test character filtering - CORRECTED for actual data structure"""
-        from backend.api_service import apply_game_filters
+        from backend.services.api_service import apply_game_filters
         
         # Test with proper game data structure that matches your actual format
         games = [
@@ -492,7 +492,7 @@ class TestAPIServiceFilteringLogic:
     
     def test_extract_filter_options_structure(self):
         """Test filter options extraction - CORRECTED for actual data structure"""
-        from backend.api_service import extract_filter_options
+        from backend.services.api_service import extract_filter_options
         
         games = [
             {
@@ -512,7 +512,7 @@ class TestAPIServiceFilteringLogic:
     
     def test_calculate_filtered_stats_accuracy(self):
         """Test filtered statistics calculation - CORRECTED for actual data structure"""
-        from backend.api_service import calculate_filtered_stats
+        from backend.services.api_service import calculate_filtered_stats
         
         games = [
             {

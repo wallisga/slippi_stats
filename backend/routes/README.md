@@ -2,30 +2,6 @@
 
 This directory contains Flask route blueprints that handle HTTP requests and responses. Routes follow the **"Routes Delegate"** principle - they are thin controllers that validate input and delegate business logic to service layers.
 
-## Development Status
-
-### ✅ Completed
-- **Backend Architecture**: Clean service-oriented design with separation of concerns
-- **Database Layer**: Pure data access with external SQL file management
-- **Routes Architecture**: Blueprint-based organization with thin route handlers
-- **Business Logic**: Separated into web and API service layers
-- **SQL Management**: Dynamic discovery and template support for external SQL files
-- **File Upload System**: Secure upload and storage with deduplication
-- **Configuration Management**: Centralized with environment variable support
-- **Error Handling**: Comprehensive validation and user feedback
-- **Observability**: OpenTelemetry instrumentation and monitoring stack
-- **Testing Framework**: Architecture-aligned testing with multiple categories
-
-### 🔄 In Progress
-- **Test Coverage Improvement**: 51% → 75% coverage target
-- **Performance Optimization**: Database query optimization and caching
-
-### 📋 Planned
-- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
-- **Export Features**: Statistics export and tournament bracket system
-- **Admin Interface**: Web-based administration panel
-- **Database Migration System**: Versioned schema changes with rollback capability
-
 ## Architecture Overview
 
 Routes are organized into focused blueprints with clear responsibilities:
@@ -272,51 +248,19 @@ def register_blueprints(app):
     register_error_handlers(app)
 ```
 
-## Contributing
+## Architecture Documentation
 
-### Development Guidelines
-- **Routes**: Use blueprint organization with thin handlers delegating to services
-- **Business Logic**: Delegate to `web_service.py` or `api_service.py`
-- **SQL**: Add new queries as external .sql files in appropriate categories
-- **Testing**: Add both service layer and HTTP endpoint tests
-- **Observability**: Use tracing decorators and structured logging
-
-### Architecture Documentation
-- For backend development details: [backend/README.md](../README.md)
-- For SQL query management: [backend/sql/README.md](../sql/README.md)
-- For frontend development details: [frontend/README.md](../../frontend/README.md)
-- For component development: [frontend/components/README.md](../../frontend/components/README.md)
-- For layout development: [frontend/layouts/README.md](../../frontend/layouts/README.md)
-- For page development: [frontend/pages/README.md](../../frontend/pages/README.md)
-- For testing guidelines: [tests/README.md](../../tests/README.md)
-- For high-level architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-
-### Adding New Features
-
-#### New Web Page
-1. Add route to `backend/routes/web_routes.py`
-2. Add business logic to `backend/web_service.py`
-3. Create template in `frontend/pages/`
-4. Add any new SQL queries to appropriate `backend/sql/` category
-
-#### New API Endpoint
-1. Add route to `backend/routes/api_routes.py`
-2. Add business logic to `backend/api_service.py`
-3. Add any new SQL queries to appropriate `backend/sql/` category
-4. Update API documentation
-
-#### New Database Queries
-1. Create .sql file in appropriate `backend/sql/` category
-2. Use the query via `sql_manager.get_query()` in database functions
-3. No Python code changes needed - queries are discovered automatically
+For comprehensive architectural information, see:
+- **High-level overview**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
+- **Backend development**: [backend/README.md](../README.md)
+- **SQL query management**: [backend/sql/README.md](../sql/README.md)
+- **Frontend architecture**: [frontend/README.md](../../frontend/README.md)
+- **Component development**: [frontend/components/README.md](../../frontend/components/README.md)
+- **Layout development**: [frontend/layouts/README.md](../../frontend/layouts/README.md)
+- **Page development**: [frontend/pages/README.md](../../frontend/pages/README.md)
+- **Testing guidelines**: [tests/README.md](../../tests/README.md)
+- **Contributing guide**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ## License
 
 This project is open source. Please see the LICENSE file for details.
-
-## Support
-
-For issues, feature requests, or questions:
-1. Check existing issues in the repository
-2. Create a new issue with detailed description
-3. Follow the contributing guidelines for code submissions

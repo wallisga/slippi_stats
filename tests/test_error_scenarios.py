@@ -5,7 +5,7 @@ class TestErrorPropagation:
     
     def test_web_service_error_handling(self):
         """Test web service errors return appropriate responses"""
-        from backend.web_service import get_player_games, prepare_homepage_data
+        from backend.services.web_service import get_player_games, prepare_homepage_data
         
         # Test with non-existent player
         games = get_player_games("NONEXISTENT#123")
@@ -21,7 +21,7 @@ class TestErrorPropagation:
     
     def test_api_service_error_handling(self):
         """Test API service error handling"""
-        from backend.api_service import process_player_basic_stats
+        from backend.services.api_service import process_player_basic_stats
         
         # Test with non-existent player
         result = process_player_basic_stats("NONEXISTENT#123")
@@ -40,8 +40,8 @@ class TestEdgeCaseHandling:
     
     def test_empty_database_scenarios(self):
         """Test application handles empty database gracefully"""
-        from backend.web_service import prepare_homepage_data
-        from backend.api_service import process_server_statistics
+        from backend.services.web_service import prepare_homepage_data
+        from backend.services.api_service import process_server_statistics
         
         # Test homepage with no data
         homepage_data = prepare_homepage_data()

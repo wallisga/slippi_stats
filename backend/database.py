@@ -771,6 +771,103 @@ def get_enhanced_database_stats():
         return basic_stats
 
 
+def get_player_games(player_code, limit=None):
+    """
+    Get all games for a specific player.
+    
+    Args:
+        player_code (str): Player tag/code to search for
+        limit (int, optional): Maximum number of games to return
+    
+    Returns:
+        list: List of game records containing the specified player
+    """
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if we have a specific query for player games
+            if sql_manager.has_query('games', 'select_by_player'):
+                # Use dedicated SQL file
+                query = sql_manager.get_query('games', 'select_by_player')
+                
+                # Add limit if specified
+                if limit:
+                    query += f" LIMIT {limit}"
+                
+                # Execute with player_code twice (for the OR condition)
+                cursor.execute(query, (player_code, player_code))
+            else:
+                # Fallback to dynamic query if no dedicated SQL file
+                base_query = """
+                SELECT DISTINCT g.* 
+                FROM games g, json_each(g.player_data) p
+                WHERE json_extract(p.value, '$.player_tag') = ?
+                ORDER BY datetime(g.start_time) DESC
+                """
+                
+                if limit:
+                    query = base_query + f" LIMIT {limit}"
+                else:
+                    query = base_query
+                    
+                cursor.execute(query, (player_code,))
+            
+            return cursor.fetchall()
+            
+    except Exception as e:
+        logger.error(f"Error getting games for player {player_code}: {str(e)}")
+        return []
+
+
+def get_player_games_with_filters(player_code, character=None, opponent=None, limit=None):
+    """
+    Get games for a player with optional filters.
+    
+    Args:
+        player_code (str): Player tag/code to search for
+        character (str, optional): Filter by character name
+        opponent (str, optional): Filter by opponent name
+        limit (int, optional): Maximum number of games to return
+    
+    Returns:
+        list: Filtered list of game records
+    """
+    try:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build dynamic query based on filters
+            base_query = """
+            SELECT DISTINCT g.* FROM games g, json_each(g.player_data) p
+            WHERE json_extract(p.value, '$.player_tag') = ?
+            """
+            
+            params = [player_code]
+            
+            # Add character filter if specified
+            if character and character != 'all':
+                base_query += " AND EXISTS (SELECT 1 FROM json_each(g.player_data) p2 WHERE json_extract(p2.value, '$.player_tag') = ? AND json_extract(p2.value, '$.character_name') = ?)"
+                params.extend([player_code, character])
+            
+            # Add opponent filter if specified
+            if opponent and opponent != 'all':
+                base_query += " AND EXISTS (SELECT 1 FROM json_each(g.player_data) p3 WHERE json_extract(p3.value, '$.player_tag') = ? AND json_extract(p3.value, '$.player_tag') != ?)"
+                params.extend([opponent, player_code])
+            
+            base_query += " ORDER BY datetime(g.start_time) DESC"
+            
+            # Add limit if specified
+            if limit:
+                base_query += f" LIMIT {limit}"
+            
+            cursor.execute(base_query, params)
+            return cursor.fetchall()
+            
+    except Exception as e:
+        logger.error(f"Error getting filtered games for player {player_code}: {str(e)}")
+        return []
+
 # =============================================================================
 # Utility Functions for SQL Management
 # =============================================================================

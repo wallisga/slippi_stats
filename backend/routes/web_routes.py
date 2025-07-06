@@ -6,7 +6,7 @@ Uses web_service for business logic and data preparation.
 """
 
 from flask import Blueprint, render_template, redirect
-import backend.web_service as web_service
+import backend.services.web_service as web_service
 
 # Create blueprint for web routes
 web_bp = Blueprint('web', __name__)

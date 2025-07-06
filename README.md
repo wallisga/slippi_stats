@@ -10,7 +10,6 @@ Slippi Stats Server provides:
 - **Real-time Data Visualization** with interactive charts and tables
 - **RESTful API** for programmatic access to game data
 - **Client Registration System** for automated replay collection
-- **Enterprise Observability** with OpenTelemetry for monitoring and debugging
 
 ## Quick Start
 
@@ -19,7 +18,6 @@ Slippi Stats Server provides:
 - SQLite 3 (included with Python)
 - Modern web browser with JavaScript enabled
 - Git (for development)
-- Docker (optional, for observability stack)
 
 ### Windows Development Setup
 ```cmd
@@ -55,27 +53,18 @@ pip install -r requirements.txt
 python app.py
 ```
 
-### Observability Setup (Optional)
-```bash
-# Start local observability stack with Docker
-docker-compose up -d
-
-# Access observability tools:
-# - Jaeger UI: http://localhost:16686 (distributed tracing)
-# - Grafana: http://localhost:3000 (dashboards, admin/admin)
-# - Prometheus: http://localhost:9090 (metrics)
-```
-
 ## Project Structure
 
 ```
 slippi_stats/
 ├── README.md                    # This file - project overview
-├── requirements.txt             # Python dependencies with observability
+├── ARCHITECTURE.md              # High-level architecture overview
+├── MIGRATION_GUIDE.md           # Refactoring journey documentation
+├── CONTRIBUTING.md              # Contribution guidelines
+├── requirements.txt             # Python dependencies
 ├── start_dev.bat               # Windows development script
-├── docker-compose.yml          # Local observability stack
-├── app.py                      # Flask application entry point (lightweight)
 ├── run_tests.bat               # Enhanced test runner with coverage
+├── app.py                      # Flask application entry point (lightweight)
 ├── backend/                    # Backend modules (service-oriented architecture)
 │   ├── README.md              # Backend architecture details
 │   ├── config.py              # Configuration management
@@ -150,6 +139,38 @@ This project follows a **modular architecture** with clear separation of concern
 - **Business Metrics**: Custom metrics for games processed, API usage, performance
 - **Real-time Monitoring**: Grafana dashboards with automated alerting
 - **Development-Friendly**: Local observability stack with Docker
+
+## Development Status
+
+### ✅ Completed
+- **Backend Architecture**: Clean service-oriented design with separation of concerns
+- **Database Layer**: Pure data access with external SQL file management
+- **Routes Architecture**: Blueprint-based organization with thin route handlers
+- **Business Logic**: Separated into web and API service layers
+- **SQL Management**: Dynamic discovery and template support for external SQL files
+- **File Upload System**: Secure upload and storage with deduplication
+- **Configuration Management**: Centralized with environment variable support
+- **Error Handling**: Comprehensive validation and user feedback
+- **Observability**: OpenTelemetry instrumentation and monitoring stack
+- **Testing Framework**: Architecture-aligned testing with multiple categories
+- **Frontend Component System**: Component-based architecture with clear separation of concerns
+
+### 🔄 In Progress
+- **Test Coverage Improvement**: 51% → 75% coverage target
+- **Performance Optimization**: Database query optimization and caching
+
+### 📋 Planned
+- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
+- **Export Features**: Statistics export and tournament bracket system
+- **Admin Interface**: Web-based administration panel
+- **Database Migration System**: Versioned schema changes with rollback capability
+
+### 🎯 Recent Achievements
+- **Architecture Refactoring**: Successfully migrated from monolithic to service-oriented architecture
+- **SQL Externalization**: All database queries moved to organized external files
+- **Component System**: Frontend components now follow "Components Do, Layouts Share, Pages Orchestrate" principle
+- **Testing Infrastructure**: Comprehensive test categories aligned with architectural boundaries
+- **Documentation**: Complete documentation coverage for all architectural layers
 
 ## Testing
 
@@ -251,48 +272,7 @@ See [tests/README.md](tests/README.md) for detailed guidance on:
 ### Authentication
 All data modification endpoints require API key authentication via `X-API-Key` header.
 
-## Development Status
-
-### ✅ Completed
-- **Backend Architecture**: Clean service-oriented design with separation of concerns
-- **Database Layer**: Pure data access with external SQL file management
-- **Routes Architecture**: Blueprint-based organization with thin route handlers
-- **Business Logic**: Separated into web and API service layers
-- **SQL Management**: Dynamic discovery and template support for external SQL files
-- **File Upload System**: Secure upload and storage with deduplication
-- **Configuration Management**: Centralized with environment variable support
-- **Error Handling**: Comprehensive validation and user feedback
-- **Observability**: OpenTelemetry instrumentation and monitoring stack
-- **Testing Framework**: Architecture-aligned testing with multiple categories
-- **Frontend Component System**: Component-based architecture with clear separation of concerns
-
-### 🔄 In Progress
-- **Test Coverage Improvement**: 51% → 75% coverage target
-- **Performance Optimization**: Database query optimization and caching
-
-### 📋 Planned
-- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
-- **Export Features**: Statistics export and tournament bracket system
-- **Admin Interface**: Web-based administration panel
-- **Database Migration System**: Versioned schema changes with rollback capability
-
-### 🎯 Recent Achievements
-- **Architecture Refactoring**: Successfully migrated from monolithic to service-oriented architecture
-- **SQL Externalization**: All database queries moved to organized external files
-- **Component System**: Frontend components now follow "Components Do, Layouts Share, Pages Orchestrate" principle
-- **Testing Infrastructure**: Comprehensive test categories aligned with architectural boundaries
-- **Documentation**: Complete documentation coverage for all architectural layers
-
 ## Contributing
-
-### Development Guidelines
-- **Backend**: Follow the established service layer pattern and module import hierarchy
-- **Routes**: Use blueprint organization with thin handlers delegating to services
-- **SQL**: Add new queries as external .sql files in appropriate categories
-- **Frontend**: Use the component-based architecture with self-contained packages
-- **Testing**: Add tests that align with the architectural boundaries
-- **Code Style**: Follow PEP 8 for Python, component patterns for frontend
-- **Observability**: Use tracing decorators and custom metrics for new features
 
 ### Getting Started
 1. Fork the repository
@@ -304,70 +284,26 @@ All data modification endpoints require API key authentication via `X-API-Key` h
 7. Submit a pull request
 
 ### Architecture Documentation
-- For backend development details: [backend/README.md](backend/README.md)
-- For routes development details: [backend/routes/README.md](backend/routes/README.md)
-- For SQL query management: [backend/sql/README.md](backend/sql/README.md)
-- For frontend development details: [frontend/README.md](frontend/README.md)
-- For component development: [frontend/components/README.md](frontend/components/README.md)
-- For layout development: [frontend/layouts/README.md](frontend/layouts/README.md)
-- For page development: [frontend/pages/README.md](frontend/pages/README.md)
-- For testing guidelines: [tests/README.md](tests/README.md)
+- **High-level overview**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Migration journey**: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)
+- **Contributing guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Backend development**: [backend/README.md](backend/README.md)
+- **Routes organization**: [backend/routes/README.md](backend/routes/README.md)
+- **SQL query management**: [backend/sql/README.md](backend/sql/README.md)
+- **Frontend architecture**: [frontend/README.md](frontend/README.md)
+- **Component development**: [frontend/components/README.md](frontend/components/README.md)
+- **Layout development**: [frontend/layouts/README.md](frontend/layouts/README.md)
+- **Page development**: [frontend/pages/README.md](frontend/pages/README.md)
+- **Testing guidelines**: [tests/README.md](tests/README.md)
 
-### Adding New Features
-
-#### New Web Page
-1. Add route to `backend/routes/web_routes.py`
-2. Add business logic to `backend/web_service.py`
-3. Create template in `frontend/pages/`
-4. Add any new SQL queries to appropriate `backend/sql/` category
-5. Add observability decorators for tracing and metrics
-6. **Add tests**: Service layer contract test + web page rendering test
-
-#### New API Endpoint
-1. Add route to `backend/routes/api_routes.py` with `@trace_api_endpoint`
-2. Add business logic to `backend/api_service.py` with `@trace_function`
-3. Add any new SQL queries to appropriate `backend/sql/` category
-4. Add metrics for business events and performance tracking
-5. Update API documentation
-6. **Add tests**: Service layer contract test + API endpoint test
-
-#### New Database Queries
-1. Create .sql file in appropriate `backend/sql/` category
-2. Use the query via `sql_manager.get_query()` in database functions
-3. Add `@trace_database_operation` decorator for performance monitoring
-4. No Python code changes needed - queries are discovered automatically
-5. **Add tests**: Database integration test for new query
-
-#### New Frontend Components
-1. Create component package in `frontend/components/`
-2. Follow the component development guide
-3. Add to layouts as needed
-4. Test component independence and reusability
-5. **Add tests**: Web page test for component integration
-
-#### New Utility Functions
-1. Add function to `backend/utils.py`
-2. Follow the established patterns for data processing
-3. **Add tests**: Utils function test for new functionality
-
-### Test-Driven Development Workflow
-1. **Identify the change**: Determine which architectural layer is affected
-2. **Add service layer test**: If business logic is involved
-3. **Add integration test**: If database, API, or upload functionality is involved
-4. **Add utils test**: If data processing utilities are involved
-5. **Run quick tests**: `run_tests.bat quick` during development
-6. **Run full tests**: `run_tests.bat` before committing
-7. **Check coverage**: `run_tests.bat coverage` to ensure coverage goals
-
-### Junior Developer Guidance
-The architecture is designed to be approachable for junior developers:
-
-1. **Start with Service Layer**: Business logic is isolated and testable
-2. **Use Test Categories**: Clear guidelines on where to add tests
-3. **Follow Import Rules**: Strict hierarchy prevents architectural violations
-4. **Use Templates**: Provided templates for common development tasks
-5. **Quick Feedback**: Fast tests provide immediate validation
-6. **Documentation**: Comprehensive guides for each architectural layer
+### Development Guidelines
+- **Backend**: Follow the established service layer pattern and module import hierarchy
+- **Routes**: Use blueprint organization with thin handlers delegating to services
+- **SQL**: Add new queries as external .sql files in appropriate categories
+- **Frontend**: Use the component-based architecture with self-contained packages
+- **Testing**: Add tests that align with the architectural boundaries
+- **Code Style**: Follow PEP 8 for Python, component patterns for frontend
+- **Observability**: Use tracing decorators and custom metrics for new features
 
 ## Configuration
 
