@@ -7,9 +7,10 @@ import urllib.parse
 import json
 import logging
 from datetime import datetime
+from backend.logging_utils import get_structured_logger
 
-# Get logger
-logger = logging.getLogger('SlippiServer')
+# Replace the existing logger line
+logger = get_structured_logger('utils')
 
 # =============================================================================
 # URL Encoding Utilities
@@ -75,16 +76,77 @@ def get_error_template_data(status_code, error_description, **kwargs):
 # =============================================================================
 
 def parse_player_data_from_game(player_json_data):
-    """Parse player data from game JSON with None safety."""
+    """Parse player data from game JSON with None safety and structured logging."""
+    logger.debug("Parsing player data from game", extra={
+        "source_function": "parse_player_data_from_game",
+        "source_module": "utils",
+        "context": {
+            "has_data": player_json_data is not None,
+            "data_type": type(player_json_data).__name__ if player_json_data else "None"
+        }
+    })
+    
+    if not player_json_data:
+        logger.debug("No player data provided", extra={
+            "source_function": "parse_player_data_from_game",
+            "source_module": "utils",
+            "context": {"result": "empty_list"}
+        })
+        return []
+    
     try:
-        if player_json_data is None:
-            return []  # Return empty list instead of None
+        # If it's a string, parse as JSON
         if isinstance(player_json_data, str):
-            return json.loads(player_json_data)
-        return player_json_data
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.warning(f"Could not parse player data: {e}")
-        return []  # Return empty list instead of None
+            parsed_data = json.loads(player_json_data)
+        else:
+            parsed_data = player_json_data
+        
+        # Ensure it's a list
+        if not isinstance(parsed_data, list):
+            logger.warning("Player data is not a list", extra={
+                "source_function": "parse_player_data_from_game",
+                "source_module": "utils",
+                "error_code": "INVALID_DATA_FORMAT",
+                "context": {
+                    "actual_type": type(parsed_data).__name__,
+                    "expected_type": "list"
+                }
+            })
+            return []
+        
+        logger.debug("Player data parsed successfully", extra={
+            "source_function": "parse_player_data_from_game",
+            "source_module": "utils",
+            "context": {
+                "players_count": len(parsed_data),
+                "data_format": "valid"
+            }
+        })
+        
+        return parsed_data
+        
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse player JSON data", extra={
+            "source_function": "parse_player_data_from_game",
+            "source_module": "utils",
+            "error_code": "JSON_DECODE_ERROR",
+            "context": {
+                "exception_message": str(e),
+                "data_preview": str(player_json_data)[:100] if player_json_data else "None"
+            }
+        })
+        return []
+    except Exception as e:
+        logger.error("Unexpected error parsing player data", extra={
+            "source_function": "parse_player_data_from_game",
+            "source_module": "utils",
+            "error_code": "PARSE_ERROR",
+            "context": {
+                "exception_type": type(e).__name__,
+                "exception_message": str(e)
+            }
+        })
+        return []
 
 def find_player_in_game_data(parsed_players, target_player_tag):
     """
@@ -251,87 +313,132 @@ def find_flexible_player_matches(raw_games, target_player_tag):
     matches.sort(key=lambda x: (x['match_type'] != 'case_insensitive', x['tag']))
     return matches
 
+# Updated extract_player_stats_from_games function
 def extract_player_stats_from_games(raw_games):
     """
-    Extract player statistics and rankings from raw game data.
-    
-    Args:
-        raw_games (list): Raw game records from database
-        
-    Returns:
-        tuple: (top_players, all_players) - both are lists of player stats
+    Extract player statistics from all games with structured logging.
     """
-    player_stats = {}
+    logger.debug("Starting player stats extraction", extra={
+        "source_function": "extract_player_stats_from_games",
+        "source_module": "utils",
+        "context": {"raw_games_count": len(raw_games)}
+    })
     
-    # Keep the existing game processing logic exactly as it was
-    for game in raw_games[:5]:  # Debug first 5 games
+    player_stats = {}
+    processed_games = 0
+    skipped_games = 0
+    
+    for game in raw_games:
         try:
             # Convert sqlite3.Row to dict for easier access
             game_dict = dict(game) if hasattr(game, 'keys') else game
+            game_id = game_dict.get('id', 'unknown')
             
+            # Parse player data from JSON
             parsed_players = parse_player_data_from_game(game_dict['player_data'])
-            logger.debug(f"Game {game_dict.get('game_id', 'unknown')}: Found {len(parsed_players)} players")
             
-            for i, player in enumerate(parsed_players):
-                logger.debug(f"  Player {i}: {player}")
+            if len(parsed_players) < 2:
+                logger.debug("Game skipped - insufficient players", extra={
+                    "source_function": "extract_player_stats_from_games",
+                    "source_module": "utils",
+                    "context": {
+                        "game_id": game_id,
+                        "players_found": len(parsed_players)
+                    }
+                })
+                skipped_games += 1
+                continue
+            
+            logger.debug("Game processing", extra={
+                "source_function": "extract_player_stats_from_games",
+                "source_module": "utils",
+                "context": {
+                    "game_id": game_id,
+                    "players_found": len(parsed_players)
+                }
+            })
+            
+            for player in parsed_players:
+                tag = player.get('player_tag', 'Unknown')
+                character = player.get('character_name', 'Unknown')
+                result = player.get('result', '')
                 
-                tag = player.get('player_tag', '')
-                if not tag:
-                    continue
-                    
+                logger.debug("Processing player result", extra={
+                    "source_function": "extract_player_stats_from_games",
+                    "source_module": "utils",
+                    "context": {
+                        "game_id": game_id,
+                        "player_tag": tag,
+                        "character": character,
+                        "result": result,
+                        "result_type": type(result).__name__
+                    }
+                })
+                
+                # Initialize player stats if first time seeing this player
                 if tag not in player_stats:
-                    player_stats[tag] = {'games': 0, 'wins': 0, 'characters': {}}
+                    player_stats[tag] = {
+                        'games': 0,
+                        'wins': 0,
+                        'characters': {}
+                    }
                 
+                # Update game count
                 player_stats[tag]['games'] += 1
                 
-                # Track character usage - ADD THIS PART
-                character = player.get('character_name', 'Unknown')
+                # Update character usage
                 if character not in player_stats[tag]['characters']:
                     player_stats[tag]['characters'][character] = 0
                 player_stats[tag]['characters'][character] += 1
                 
-                # Check result field instead of placement
-                result = player.get('result', '')
-                logger.debug(f"  Player {tag} result: {result} (type: {type(result)})")
-                
+                # Process wins with structured logging
                 if result == 'Win':
                     player_stats[tag]['wins'] += 1
-                    logger.debug(f"  -> Counted as WIN for {tag}")
+                    logger.debug("Win recorded", extra={
+                        "source_function": "extract_player_stats_from_games",
+                        "source_module": "utils",
+                        "context": {
+                            "game_id": game_id,
+                            "player_tag": tag,
+                            "total_wins": player_stats[tag]['wins']
+                        }
+                    })
+                elif result == 'Loss':
+                    logger.debug("Loss recorded", extra={
+                        "source_function": "extract_player_stats_from_games",
+                        "source_module": "utils",
+                        "context": {
+                            "game_id": game_id,
+                            "player_tag": tag,
+                            "total_games": player_stats[tag]['games']
+                        }
+                    })
                 else:
-                    logger.debug(f"  -> Counted as LOSS for {tag}")
-                    
-        except Exception as e:
-            logger.warning(f"Error extracting stats from game {game.get('game_id', 'unknown')}: {e}")
-            continue
-    
-    # Process remaining games without debug spam
-    for game in raw_games[5:]:
-        try:
-            # Convert sqlite3.Row to dict for easier access
-            game_dict = dict(game) if hasattr(game, 'keys') else game
+                    logger.warning("Unknown result type", extra={
+                        "source_function": "extract_player_stats_from_games",
+                        "source_module": "utils",
+                        "error_code": "UNKNOWN_RESULT",
+                        "context": {
+                            "game_id": game_id,
+                            "player_tag": tag,
+                            "result": result,
+                            "result_type": type(result).__name__
+                        }
+                    })
             
-            parsed_players = parse_player_data_from_game(game_dict['player_data'])
-            for player in parsed_players:
-                tag = player.get('player_tag', '')
-                if not tag:
-                    continue
-                    
-                if tag not in player_stats:
-                    player_stats[tag] = {'games': 0, 'wins': 0, 'characters': {}}
-                
-                player_stats[tag]['games'] += 1
-                
-                # Track character usage
-                character = player.get('character_name', 'Unknown')
-                if character not in player_stats[tag]['characters']:
-                    player_stats[tag]['characters'][character] = 0
-                player_stats[tag]['characters'][character] += 1
-                
-                if player.get('result') == 'Win':
-                    player_stats[tag]['wins'] += 1
-                    
+            processed_games += 1
+            
         except Exception as e:
-            logger.warning(f"Error extracting stats from game {game.get('game_id', 'unknown')}: {e}")
+            skipped_games += 1
+            logger.error("Error processing game", extra={
+                "source_function": "extract_player_stats_from_games",
+                "source_module": "utils",
+                "error_code": "GAME_PROCESSING_ERROR",
+                "context": {
+                    "game_id": game_dict.get('id', 'unknown'),
+                    "exception_message": str(e)
+                }
+            })
             continue
     
     # Calculate win rates and build player list
@@ -339,22 +446,19 @@ def extract_player_stats_from_games(raw_games):
     for tag, stats in player_stats.items():
         win_rate = calculate_win_rate(stats['wins'], stats['games'])
         
-        # NEW: Calculate most played character
+        # Calculate most played character
         most_played_character = None
         if stats['characters']:
             most_played_character = max(stats['characters'].items(), key=lambda x: x[1])[0]
         
         all_players.append({
-            # Frontend expects these field names
-            'name': tag,  # Frontend expects 'name' field
-            'code': tag,  # Frontend expects 'code' field  
-            'code_encoded': encode_player_tag(tag),  # Frontend expects 'code_encoded'
+            'name': tag,
+            'code': tag,
+            'code_encoded': encode_player_tag(tag),
             'games': stats['games'],
             'wins': stats['wins'],
             'win_rate': win_rate,
-            'most_played_character': most_played_character,  # NEW FIELD
-            
-            # Legacy format for backward compatibility
+            'most_played_character': most_played_character,
             'tag': tag,
             'encoded_tag': encode_player_tag(tag)
         })
@@ -363,34 +467,56 @@ def extract_player_stats_from_games(raw_games):
     all_players.sort(key=lambda x: x['games'], reverse=True)
     
     # Get top players (minimum games threshold)
-    min_games = 5  # Could be moved to config
+    min_games = 5
     top_players = [p for p in all_players if p['games'] >= min_games]
     top_players.sort(key=lambda x: x['win_rate'], reverse=True)
     
-    logger.debug(f"Returning {len(top_players)} top players and {len(all_players)} total players")
+    logger.info("Player stats extraction completed", extra={
+        "source_function": "extract_player_stats_from_games",
+        "source_module": "utils",
+        "context": {
+            "processed_games": processed_games,
+            "skipped_games": skipped_games,
+            "total_players": len(all_players),
+            "qualified_top_players": len(top_players),
+            "min_games_threshold": min_games
+        }
+    })
     
     return top_players, all_players
 
 def process_recent_games_data(raw_games, limit=10):
-    """
-    Process raw games into recent games format for display.
+    """Process raw games into recent games format for display with structured logging."""
+    logger.debug("Processing recent games data", extra={
+        "source_function": "process_recent_games_data",
+        "source_module": "utils",
+        "context": {
+            "raw_games_count": len(raw_games),
+            "limit": limit
+        }
+    })
     
-    Args:
-        raw_games (list): Raw game records from database (should be pre-sorted by recency)
-        limit (int): Maximum number of games to return
-        
-    Returns:
-        list: Processed recent games data
-    """
     recent_games = []
+    processed_count = 0
+    skipped_count = 0
     
     for game in raw_games[:limit]:
         try:
             # Convert sqlite3.Row to dict for easier access
             game_dict = dict(game) if hasattr(game, 'keys') else game
+            game_id = game_dict.get('id', 'unknown')
             
             parsed_players = parse_player_data_from_game(game_dict['player_data'])
             if len(parsed_players) < 2:
+                logger.debug("Game skipped - insufficient players for recent games", extra={
+                    "source_function": "process_recent_games_data",
+                    "source_module": "utils",
+                    "context": {
+                        "game_id": game_id,
+                        "players_found": len(parsed_players)
+                    }
+                })
+                skipped_count += 1
                 continue
                 
             # Get both players
@@ -405,53 +531,61 @@ def process_recent_games_data(raw_games, limit=10):
             elif p2_result == 'Win':
                 winner, loser = player2, player1
             else:
-                # If no clear winner (shouldn't happen), use first player as "winner"
+                # If no clear winner, use first player as "winner"
                 winner, loser = player1, player2
+                logger.warning("No clear winner found in game", extra={
+                    "source_function": "process_recent_games_data",
+                    "source_module": "utils",
+                    "error_code": "NO_CLEAR_WINNER",
+                    "context": {
+                        "game_id": game_id,
+                        "p1_result": p1_result,
+                        "p2_result": p2_result
+                    }
+                })
             
-            # Get player data
-            player1_tag = safe_get_player_field(player1, 'player_tag')
-            player2_tag = safe_get_player_field(player2, 'player_tag')
-            player1_char = safe_get_player_field(player1, 'character_name')
-            player2_char = safe_get_player_field(player2, 'character_name')
-            
-            # Determine the result string for the winner
-            result_text = f"Win - {safe_get_player_field(winner, 'player_tag')} vs {safe_get_player_field(loser, 'player_tag')}"
-            
-            # Build recent game record matching frontend template expectations
             recent_game = {
-                'game_id': game_dict['game_id'],
-                'start_time': game_dict['start_time'],
-                'time': game_dict['start_time'],  # Frontend expects 'time' field
-                'stage_id': game_dict['stage_id'],
-                'result': result_text,
-                
-                # Player 1 data
-                'player1': player1_tag,
-                'player1_tag_encoded': encode_player_tag(player1_tag),
-                'character1': player1_char,
-                
-                # Player 2 data
-                'player2': player2_tag,
-                'player2_tag_encoded': encode_player_tag(player2_tag),
-                'character2': player2_char,
-                
-                # Legacy format for backward compatibility
+                'game_id': game_dict.get('id'),
+                'start_time': game_dict.get('start_time'),
                 'winner': {
-                    'player_tag': safe_get_player_field(winner, 'player_tag'),
-                    'character_name': safe_get_player_field(winner, 'character_name'),
-                    'encoded_tag': encode_player_tag(safe_get_player_field(winner, 'player_tag'))
+                    'name': winner.get('player_name', 'Unknown'),
+                    'tag': winner.get('player_tag', 'Unknown'),
+                    'encoded_tag': encode_player_tag(winner.get('player_tag', 'Unknown')),
+                    'character': winner.get('character_name', 'Unknown')
                 },
                 'loser': {
-                    'player_tag': safe_get_player_field(loser, 'player_tag'),
-                    'character_name': safe_get_player_field(loser, 'character_name'),
-                    'encoded_tag': encode_player_tag(safe_get_player_field(loser, 'player_tag'))
+                    'name': loser.get('player_name', 'Unknown'),
+                    'tag': loser.get('player_tag', 'Unknown'),
+                    'encoded_tag': encode_player_tag(loser.get('player_tag', 'Unknown')),
+                    'character': loser.get('character_name', 'Unknown')
                 }
             }
             
             recent_games.append(recent_game)
+            processed_count += 1
             
         except Exception as e:
-            logger.warning(f"Error processing recent game {dict(game).get('game_id', 'unknown') if hasattr(game, 'keys') else 'unknown'}: {e}")
+            skipped_count += 1
+            logger.error("Error processing recent game", extra={
+                "source_function": "process_recent_games_data",
+                "source_module": "utils",
+                "error_code": "RECENT_GAME_PROCESSING_ERROR",
+                "context": {
+                    "game_id": game_dict.get('id', 'unknown') if 'game_dict' in locals() else 'unknown',
+                    "exception_message": str(e)
+                }
+            })
             continue
+    
+    logger.info("Recent games processing completed", extra={
+        "source_function": "process_recent_games_data",
+        "source_module": "utils",
+        "context": {
+            "processed_count": processed_count,
+            "skipped_count": skipped_count,
+            "returned_count": len(recent_games),
+            "limit": limit
+        }
+    })
     
     return recent_games
