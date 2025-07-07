@@ -30,7 +30,7 @@ def process_server_statistics():
         
         # Use existing unique_players query instead of count_unique_players
         try:
-            unique_players = execute_query('stats', 'unique_players', fetch_one=True)
+            unique_players = execute_query('stats', 'count_unique_players', fetch_one=True)
         except:
             # Fallback if stats query doesn't work
             unique_players = {'count': 0}
