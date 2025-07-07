@@ -1,1 +1,0 @@
-SELECT upload_date FROM games ORDER BY upload_date DESC LIMIT 1

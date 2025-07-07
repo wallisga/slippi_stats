@@ -1,1 +1,0 @@
-DELETE FROM {api_keys_table} WHERE expires_at < ?

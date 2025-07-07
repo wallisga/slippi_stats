@@ -1,1 +1,0 @@
-SELECT 1 FROM games WHERE game_id = ?

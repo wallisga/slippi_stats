@@ -1,1 +1,0 @@
-SELECT * FROM clients ORDER BY last_active DESC

@@ -1,1 +1,0 @@
-SELECT 1 FROM clients WHERE client_id = ?

@@ -1,1 +1,0 @@
-SELECT client_id, expires_at FROM {api_keys_table} WHERE api_key = ?

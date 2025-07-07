@@ -1,1 +1,0 @@
-SELECT COUNT(*) as count, SUM(file_size) as total_size FROM files

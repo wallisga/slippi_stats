@@ -1,1 +1,0 @@
-SELECT 1 FROM files WHERE file_hash = ?

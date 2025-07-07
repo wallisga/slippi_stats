@@ -1,3 +1,0 @@
-UPDATE clients 
-SET hostname = ?, platform = ?, version = ?, last_active = ?
-WHERE client_id = ?
