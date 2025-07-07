@@ -42,14 +42,14 @@ def create_app():
     # Error handlers
     @app.errorhandler(404)
     def page_not_found(error):
-        return render_template('pages/error_status/error.html', 
+        return render_template('pages/error_status/error_status.html', 
                              status_code=404, 
                              error_title="Page Not Found",
                              error_description="The page you're looking for doesn't exist."), 404
     
     @app.errorhandler(500)
     def internal_error(error):
-        return render_template('pages/error_status/error.html',
+        return render_template('pages/error_status/error_status.html',
                              status_code=500,
                              error_title="Internal Server Error", 
                              error_description="Something went wrong on our end."), 500

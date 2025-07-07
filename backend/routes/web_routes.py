@@ -1,3 +1,6 @@
+# Fixed backend/routes/web_routes.py - Player Profile Routes
+# These routes now handle the simplified service function responses
+
 """
 Web routes for Slippi Server.
 
@@ -28,24 +31,28 @@ def players():
     return render_template('pages/players/players.html', **data)
 
 # =============================================================================
-# Player Profile Pages
+# Player Profile Pages - FIXED
 # =============================================================================
 
 @web_bp.route('/player/<encoded_player_code>')
 def player_profile(encoded_player_code):
-    """Basic player profile page."""
-    result = web_service.process_player_profile_request(encoded_player_code)
-    if result['redirect']:
-        return redirect(result['url'])
-    return render_template('pages/player_basic/player_basic.html', **result['data'])
+    """
+    Basic player profile page.
+    """
+    # Service function will abort(404) or abort(500) if there are issues
+    # Flask error handlers will catch these and show proper error pages
+    data = web_service.process_player_profile_request(encoded_player_code)
+    return render_template('pages/player_basic/player_basic.html', **data)
 
 @web_bp.route('/player/<encoded_player_code>/detailed')
 def player_detailed(encoded_player_code):
-    """Detailed player analysis page."""
-    result = web_service.process_player_detailed_request(encoded_player_code)
-    if result['redirect']:
-        return redirect(result['url'])
-    return render_template('pages/player_detailed/player_detailed.html', **result['data'])
+    """
+    Detailed player analysis page.
+    """
+    # Service function will abort(404) or abort(500) if there are issues
+    # Flask error handlers will catch these and show proper error pages
+    data = web_service.process_player_detailed_request(encoded_player_code)
+    return render_template('pages/player_detailed/player_detailed.html', **data)
 
 # =============================================================================
 # Information Pages

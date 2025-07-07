@@ -73,7 +73,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Setup search inputs for filtering options
+     * Setup search inputs for filtering options
      */
     setupSearchInputs() {
         // Setup search for character filter
@@ -87,7 +87,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Setup individual search input with debouncing
+     * Setup individual search input with debouncing
      */
     setupSearchInput(searchInputId, containerId, filterType) {
         const searchInput = document.getElementById(searchInputId);
@@ -114,7 +114,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Filter visible options based on search term
+     * Filter visible options based on search term
      */
     filterVisibleOptions(containerId, filterType) {
         const container = document.getElementById(containerId);
@@ -167,7 +167,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Show indicator when selected items are hidden by search
+     * Show indicator when selected items are hidden by search
      */
     updateHiddenSelectedIndicator(container, hiddenSelectedCount) {
         if (hiddenSelectedCount > 0) {
@@ -178,7 +178,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Update search result count display with selection info
+     * Update search result count display with selection info
      */
     updateSearchResultCount(containerId, visibleCount) {
         const countElement = document.querySelector(`#${containerId} .search-result-count`);
@@ -201,7 +201,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Get options key for container ID
+     * Get options key for container ID
      */
     getOptionsKey(containerId) {
         const mapping = {
@@ -213,23 +213,51 @@ class AdvancedFilters {
     }
     
     getSelectedFilters() {
-        return {
-            character: this.getSelectedCheckboxValues('characterCheckboxes'),
-            opponent: this.getSelectedCheckboxValues('opponentCheckboxes'),
-            opponent_character: this.getSelectedCheckboxValues('opponentCharCheckboxes')
+        const characterFilter = this.getSelectedCheckboxValues('characterCheckboxes');
+        const opponentFilter = this.getSelectedCheckboxValues('opponentCheckboxes');
+        const opponentCharacterFilter = this.getSelectedCheckboxValues('opponentCharCheckboxes');
+        
+        // FIXED: Always send all three filters, even if they're 'all'
+        const filters = {
+            character: characterFilter,
+            opponent: opponentFilter,
+            opponent_character: opponentCharacterFilter
         };
+        
+        console.log('🔍 Sending filters to backend:', filters);
+        return filters;
     }
     
     getSelectedCheckboxValues(containerId) {
         const container = document.getElementById(containerId);
-        if (!container) return 'all';
+        if (!container) {
+            console.warn(`❌ Container ${containerId} not found`);
+            return 'all';
+        }
         
-        // FIXED: Count ALL checked checkboxes regardless of search visibility
-        // Search is only a visual helper, not a filter for the actual selection
         const checkboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all):checked');
         const selected = Array.from(checkboxes).map(cb => cb.value);
         
-        return selected.length > 0 ? selected : 'all';
+        // Get total number of available options
+        const totalCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all)');
+        
+        console.log(`📊 ${containerId}: ${selected.length}/${totalCheckboxes.length} selected`);
+        
+        // If nothing selected, return 'all'
+        if (selected.length === 0) {
+            console.log(`   → Returning 'all' (nothing selected)`);
+            return 'all';
+        }
+        
+        // If everything selected, return 'all' 
+        if (selected.length === totalCheckboxes.length) {
+            console.log(`   → Returning 'all' (everything selected)`);
+            return 'all';
+        }
+        
+        // Return array of selected items when it's a partial selection
+        console.log(`   → Returning array:`, selected.slice(0, 3), selected.length > 3 ? `... +${selected.length - 3} more` : '');
+        return selected;
     }
     
     populateFilterOptions(filterOptions) {
@@ -295,6 +323,9 @@ class AdvancedFilters {
         // Setup select-all functionality
         const selectAllCheckbox = document.getElementById(selectAllId);
         if (selectAllCheckbox) {
+            // FIXED: Store reference to 'this' for use in event handler
+            const self = this;
+            
             selectAllCheckbox.addEventListener('change', function() {
                 const checkboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all)');
                 
@@ -304,9 +335,10 @@ class AdvancedFilters {
                     cb.checked = this.checked;
                 });
                 
+                // FIXED: Use 'self' instead of 'that'
                 // Update the label after changing selections
                 const checkedCount = container.querySelectorAll('input[type="checkbox"]:not(.select-all):checked').length;
-                that.updateSelectAllLabel(this, checkedCount, checkboxes.length, containerId);
+                self.updateSelectAllLabel(this, checkedCount, checkboxes.length, containerId);
             });
             
             // Initialize select-all state
@@ -340,7 +372,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Update select-all label to show actual selection count
+     * Update select-all label to show actual selection count
      */
     updateSelectAllLabel(selectAllCheckbox, checkedCount, totalCount, containerId) {
         const label = selectAllCheckbox.nextElementSibling;
@@ -409,7 +441,7 @@ class AdvancedFilters {
     }
     
     /**
-     * NEW: Clear search for specific filter type
+     * Clear search for specific filter type
      */
     clearSearch(filterType) {
         const searchInputs = {

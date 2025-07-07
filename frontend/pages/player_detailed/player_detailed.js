@@ -452,6 +452,15 @@ async function fetchPlayerData(filters = {}) {
     }
 }
 
+// Extract filter options from API data
+function extractFilterOptions(data) {
+    return {
+        characters: Object.keys(data.character_stats || {}).filter(c => c !== 'Unknown'),
+        opponents: Object.keys(data.opponent_stats || {}).filter(o => o !== 'Unknown'),
+        opponent_characters: Object.keys(data.opponent_character_stats || {}).filter(c => c !== 'Unknown')
+    };
+}
+
 // ✅ COMPONENT COORDINATION: Update UI using component APIs
 function updateUI(data) {
     console.log('Updating UI with search-filtered data:', data);
@@ -472,6 +481,13 @@ function updateUI(data) {
     
     // Update filter summary
     updateFilterSummary(data);
+
+    // Populate filter options
+    if (window.advancedFilters && typeof window.advancedFilters.populateFilterOptions === 'function') {
+        const filterOptions = extractFilterOptions(data);
+        window.advancedFilters.populateFilterOptions(filterOptions);
+        console.log('Populated filter options:', filterOptions);
+    }    
     
     // ✅ COMPONENT INTERACTION: Update stats tables using component
     if (window.TablesComponent) {
@@ -555,6 +571,7 @@ function updateFilterSummary(data) {
     
     if (totalGamesCount) totalGamesCount.textContent = data.total_games || 0;
 }
+
 
 // Helper functions
 function showLoading() {
