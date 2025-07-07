@@ -1,0 +1,1 @@
+SELECT * FROM {api_keys_table} WHERE client_id = ?

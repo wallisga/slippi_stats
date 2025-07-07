@@ -1,0 +1,1 @@
+UPDATE files SET metadata = ? WHERE file_id = ?

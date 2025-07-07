@@ -59,96 +59,70 @@ def process_combined_upload(client_id, upload_data):
 
 def process_detailed_player_data(player_code, filters=None):
     """
-    Process detailed player data with filtering.
+    Process detailed player data with filtering - CORRECTED VERSION.
+    
+    This function orchestrates the data processing pipeline to return
+    the structure expected by the frontend charts and tables.
     
     Args:
         player_code (str): Player tag/code
         filters (dict): Optional filters for character, opponent, etc.
     
     Returns:
-        dict: Detailed player data with applied filters
+        dict: Detailed player data with processed statistics for charts/tables
     """
     try:
         logger.info(f"Processing detailed player data for: {player_code}")
         if filters:
             logger.info(f"Applying filters: {filters}")
         
-        # Get all games for the player
-        from backend.database import get_player_games
-        games = get_player_games(player_code)
-        
-        if not games:
-            return {
-                'success': False,
-                'error': 'No games found for player',
-                'player_code': player_code
-            }
-        
-        # Apply filters if provided
-        if filters:
-            games = apply_game_filters(games, filters)
-        
-        # Process the filtered games data
+        # 1. Get all games for the player using the database layer
+        from backend.database import get_games_all
         from backend.utils import process_raw_games_for_player
-        processed_data = process_raw_games_for_player(games, player_code)
         
-        return {
-            'success': True,
+        raw_games = get_games_all()
+        all_games = process_raw_games_for_player(raw_games, player_code)
+        
+        if not all_games:
+            return None  # This will trigger 404 in the API route
+        
+        # 2. Extract filter options from all games (MISSING IN YOUR VERSION)
+        filter_options = _extract_filter_options(all_games)
+        
+        # 3. Get filter parameters with defaults
+        character_filter = filters.get('character', 'all') if filters else 'all'
+        opponent_filter = filters.get('opponent', 'all') if filters else 'all'
+        opponent_character_filter = filters.get('opponent_character', 'all') if filters else 'all'
+        
+        # 4. Apply filters to the processed games
+        filtered_games = _apply_game_filters(
+            all_games, character_filter, opponent_filter, opponent_character_filter
+        )
+        
+        # 5. Calculate comprehensive statistics (THE KEY MISSING PIECE)
+        stats = _calculate_filtered_stats(filtered_games, filter_options)
+        
+        # 6. Build the response in the format the frontend expects
+        response = {
             'player_code': player_code,
-            'filters_applied': filters or {},
-            'total_games': len(games),
-            'data': processed_data
+            'filter_options': filter_options,
+            'applied_filters': {
+                'character': character_filter,
+                'opponent': opponent_filter,
+                'opponent_character': opponent_character_filter
+            }
         }
+        
+        # 7. Add all the calculated stats (character_stats, date_stats, etc.)
+        response.update(stats)
+        
+        return response
         
     except Exception as e:
         logger.error(f"Error processing detailed player data for {player_code}: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e),
-            'player_code': player_code
-        }
-
-def apply_game_filters(games, filters):
-    """
-    Apply character and opponent filters to games list.
-    
-    Args:
-        games (list): List of game records
-        filters (dict): Filters to apply
-    
-    Returns:
-        list: Filtered games
-    """
-    if not filters:
-        return games
-    
-    filtered_games = games
-    
-    # Apply character filter
-    character_filter = filters.get('character', 'all')
-    if character_filter and character_filter != 'all':
-        filtered_games = [
-            game for game in filtered_games 
-            if _game_matches_character_filter(game, character_filter)
-        ]
-    
-    # Apply opponent filter
-    opponent_filter = filters.get('opponent', 'all')
-    if opponent_filter and opponent_filter != 'all':
-        filtered_games = [
-            game for game in filtered_games
-            if _game_matches_opponent_filter(game, opponent_filter)
-        ]
-    
-    # Apply opponent character filter
-    opponent_char_filter = filters.get('opponent_character', 'all')
-    if opponent_char_filter and opponent_char_filter != 'all':
-        filtered_games = [
-            game for game in filtered_games
-            if _game_matches_opponent_character_filter(game, opponent_char_filter)
-        ]
-    
-    return filtered_games
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
 
 
 def process_player_basic_stats(player_code):
@@ -314,6 +288,36 @@ def _process_single_file(client_id, file_info):
     except Exception as e:
         logger.error(f"Error processing file: {str(e)}")
         return _create_file_error_result(file_info, str(e))
+    
+def _apply_game_filters(games, character_filter='all', opponent_filter='all', opponent_character_filter='all'):
+    """Apply filtering to a list of games based on various criteria."""
+    filtered_games = games
+    
+    # Apply character filter
+    if character_filter != 'all':
+        if isinstance(character_filter, list):
+            character_values = character_filter
+        else:
+            character_values = character_filter.split('|') if '|' in character_filter else [character_filter]
+        filtered_games = [g for g in filtered_games if g['player'].get('character_name') in character_values]
+    
+    # Apply opponent filter
+    if opponent_filter != 'all':
+        if isinstance(opponent_filter, list):
+            opponent_values = opponent_filter
+        else:
+            opponent_values = opponent_filter.split('|') if '|' in opponent_filter else [opponent_filter]
+        filtered_games = [g for g in filtered_games if g['opponent'].get('player_tag') in opponent_values]
+    
+    # Apply opponent character filter
+    if opponent_character_filter != 'all':
+        if isinstance(opponent_character_filter, list):
+            opp_char_values = opponent_character_filter
+        else:
+            opp_char_values = opponent_character_filter.split('|') if '|' in opponent_character_filter else [opponent_character_filter]
+        filtered_games = [g for g in filtered_games if g['opponent'].get('character_name') in opp_char_values]
+    
+    return filtered_games
 
 def _extract_file_data(file_info):
     """Extract and validate file data from upload info."""
@@ -466,6 +470,104 @@ def _update_file_counts(files_result, file_result):
             files_result['duplicates'] += 1
     else:
         files_result['errors'] += 1
+
+def _extract_filter_options(games):
+    """Extract all available filter options from a set of games."""
+    characters_played = set()
+    opponents_faced = set()
+    opponent_characters_faced = set()
+    
+    for game in games:
+        characters_played.add(game['player'].get('character_name', 'Unknown'))
+        opponents_faced.add(game['opponent'].get('player_tag', 'Unknown'))
+        opponent_characters_faced.add(game['opponent'].get('character_name', 'Unknown'))
+    
+    return {
+        'characters': sorted(list(characters_played)),
+        'opponents': sorted(list(opponents_faced)),
+        'opponent_characters': sorted(list(opponent_characters_faced))
+    }
+
+
+def _calculate_filtered_stats(filtered_games, filter_options):
+    """Calculate comprehensive statistics for filtered game data."""
+    if not filtered_games:
+        return {
+            'total_games': 0,
+            'wins': 0,
+            'overall_winrate': 0,
+            'character_stats': {},
+            'opponent_stats': {},
+            'opponent_character_stats': {},
+            'date_stats': {}
+        }
+    
+    total_filtered = len(filtered_games)
+    wins_filtered = sum(1 for game in filtered_games if game['result'] == 'Win')
+    overall_winrate = wins_filtered / total_filtered if total_filtered > 0 else 0
+    
+    # Character stats
+    character_stats = {}
+    for char in filter_options['characters']:
+        char_games = [g for g in filtered_games if g['player'].get('character_name') == char]
+        char_total = len(char_games)
+        char_wins = sum(1 for g in char_games if g['result'] == 'Win')
+        character_stats[char] = {
+            'games': char_total,
+            'wins': char_wins,
+            'win_rate': char_wins / char_total if char_total > 0 else 0
+        }
+    
+    # Opponent stats
+    opponent_stats = {}
+    for opp in filter_options['opponents']:
+        opp_games = [g for g in filtered_games if g['opponent'].get('player_tag') == opp]
+        opp_total = len(opp_games)
+        opp_wins = sum(1 for g in opp_games if g['result'] == 'Win')
+        opponent_stats[opp] = {
+            'games': opp_total,
+            'wins': opp_wins,
+            'win_rate': opp_wins / opp_total if opp_total > 0 else 0
+        }
+    
+    # Opponent character stats
+    opponent_char_stats = {}
+    for opp_char in filter_options['opponent_characters']:
+        opp_char_games = [g for g in filtered_games if g['opponent'].get('character_name') == opp_char]
+        opp_char_total = len(opp_char_games)
+        opp_char_wins = sum(1 for g in opp_char_games if g['result'] == 'Win')
+        opponent_char_stats[opp_char] = {
+            'games': opp_char_total,
+            'wins': opp_char_wins,
+            'win_rate': opp_char_wins / opp_char_total if opp_char_total > 0 else 0
+        }
+    
+    # Date stats
+    date_stats = {}
+    for game in filtered_games:
+        date = game['start_time'].split('T')[0] if 'T' in game['start_time'] else game['start_time']
+        if date not in date_stats:
+            date_stats[date] = {'games': 0, 'wins': 0}
+        
+        date_stats[date]['games'] += 1
+        if game['result'] == 'Win':
+            date_stats[date]['wins'] += 1
+    
+    # Calculate win rates for dates and sort
+    for date in date_stats:
+        date_stats[date]['win_rate'] = date_stats[date]['wins'] / date_stats[date]['games']
+    
+    date_stats_sorted = {k: date_stats[k] for k in sorted(date_stats.keys())}
+    
+    return {
+        'total_games': total_filtered,
+        'wins': wins_filtered,
+        'overall_winrate': overall_winrate,
+        'character_stats': character_stats,
+        'opponent_stats': opponent_stats,
+        'opponent_character_stats': opponent_char_stats,
+        'date_stats': date_stats_sorted
+    }        
 
 # ============================================================================
 # Utility Functions
