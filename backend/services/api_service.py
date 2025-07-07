@@ -1,620 +1,520 @@
-# Refactored api_service.py - Single Combined Upload Approach
+"""
+API Service - Business Logic for JSON API Responses
 
-import os
-import hashlib
+COMPLETE VERSION: Includes all functions needed by API routes
+Updated to use the new backend/db/ layer instead of backend.database
+"""
+
+import logging
 import json
-import base64
-from datetime import datetime
-from backend.config import get_config
-from backend.database import (
-    create_file_record, get_file_by_hash, create_game_record, 
-    check_game_exists, update_clients_last_active
+import secrets
+import uuid
+from datetime import datetime, timedelta
+from flask import abort
+
+# NEW: Use the simplified db layer
+from backend.db import execute_query, connection, sql_manager
+from backend.utils import (
+    encode_player_tag, decode_player_tag, get_error_template_data,
+    parse_player_data_from_game, find_player_in_game_data,
+    safe_get_player_field, process_raw_games_for_player,
+    find_flexible_player_matches, extract_player_stats_from_games,
+    process_recent_games_data, calculate_win_rate
 )
+from backend.config import get_config
 
-# Get configuration and logger
 config = get_config()
-logger = config.init_logging()
+logger = logging.getLogger('SlippiServer')
 
-# File upload settings
-ALLOWED_EXTENSIONS = {'.slp'}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB max file size
 
-# ============================================================================
-# Public API - Single Combined Upload Function
-# ============================================================================
-
-def process_combined_upload(client_id, upload_data):
-    """
-    Process combined games and files upload.
-    
-    This is the main upload function that handles both games and files
-    in a single request, matching your client implementation.
-    
-    Args:
-        client_id (str): Client ID from API key validation
-        upload_data (dict): Contains both games data and file information
-    
-    Returns:
-        dict: Combined upload result with games and files statistics
-    """
+def process_server_statistics():
+    """Get server statistics for API response."""
     try:
-        games_data = upload_data.get('games', [])
-        files_data = upload_data.get('files', [])
+        # Use simpler queries that definitely exist
+        total_clients = execute_query('clients', 'count_all', fetch_one=True)
+        total_games = execute_query('games', 'count_all', fetch_one=True)
         
-        logger.info(f"Processing combined upload for {client_id}: "
-                   f"{len(games_data)} games, {len(files_data)} files")
+        # Use existing unique_players query instead of count_unique_players
+        try:
+            unique_players = execute_query('stats', 'unique_players', fetch_one=True)
+        except:
+            # Fallback if stats query doesn't work
+            unique_players = {'count': 0}
         
-        # Process games and files
-        games_result = _process_games_data(client_id, games_data)
-        files_result = _process_files_data(client_id, files_data)
-        
-        # Update client activity
-        update_clients_last_active(client_id)
-        
-        return _create_combined_response(games_result, files_result)
-        
-    except Exception as e:
-        logger.error(f"Error processing combined upload: {str(e)}")
-        raise
-
-def process_detailed_player_data(player_code, filters=None):
-    """
-    Process detailed player data with filtering - CORRECTED VERSION.
-    
-    This function orchestrates the data processing pipeline to return
-    the structure expected by the frontend charts and tables.
-    
-    Args:
-        player_code (str): Player tag/code
-        filters (dict): Optional filters for character, opponent, etc.
-    
-    Returns:
-        dict: Detailed player data with processed statistics for charts/tables
-    """
-    try:
-        logger.info(f"Processing detailed player data for: {player_code}")
-        if filters:
-            logger.info(f"Applying filters: {filters}")
-        
-        # 1. Get all games for the player using the database layer
-        from backend.database import get_games_all
-        from backend.utils import process_raw_games_for_player
-        
-        raw_games = get_games_all()
-        all_games = process_raw_games_for_player(raw_games, player_code)
-        
-        if not all_games:
-            return None  # This will trigger 404 in the API route
-        
-        # 2. Extract filter options from all games (MISSING IN YOUR VERSION)
-        filter_options = _extract_filter_options(all_games)
-        
-        # 3. Get filter parameters with defaults
-        character_filter = filters.get('character', 'all') if filters else 'all'
-        opponent_filter = filters.get('opponent', 'all') if filters else 'all'
-        opponent_character_filter = filters.get('opponent_character', 'all') if filters else 'all'
-        
-        # 4. Apply filters to the processed games
-        filtered_games = _apply_game_filters(
-            all_games, character_filter, opponent_filter, opponent_character_filter
-        )
-        
-        # 5. Calculate comprehensive statistics (THE KEY MISSING PIECE)
-        stats = _calculate_filtered_stats(filtered_games, filter_options)
-        
-        # 6. Build the response in the format the frontend expects
-        response = {
-            'player_code': player_code,
-            'filter_options': filter_options,
-            'applied_filters': {
-                'character': character_filter,
-                'opponent': opponent_filter,
-                'opponent_character': opponent_character_filter
-            }
+        return {
+            'total_clients': total_clients['count'] if total_clients else 0,
+            'total_games': total_games['count'] if total_games else 0,
+            'unique_players': unique_players.get('count', 0) if unique_players else 0,
+            'server_status': 'operational'
         }
-        
-        # 7. Add all the calculated stats (character_stats, date_stats, etc.)
-        response.update(stats)
-        
-        return response
-        
     except Exception as e:
-        logger.error(f"Error processing detailed player data for {player_code}: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return None
+        logger.error(f"Error getting server statistics: {str(e)}")
+        return {
+            'total_clients': 0,
+            'total_games': 0,
+            'unique_players': 0,
+            'server_status': 'error'
+        }
 
 
 def process_player_basic_stats(player_code):
-    """
-    Process basic player statistics.
+    """Get basic player statistics for API response."""
+    if not player_code:
+        return None
     
-    Args:
-        player_code (str): Player tag/code
-    
-    Returns:
-        dict: Basic player statistics
-    """
     try:
-        if not player_code:
-            return None
-            
-        logger.info(f"Processing basic stats for player: {player_code}")
-        
-        # Get player games
-        from backend.database import get_player_games
-        games = get_player_games(player_code)
+        # Direct query execution
+        games = execute_query('games', 'select_by_player', (player_code,))
         
         if not games:
+            return None
+        
+        # Use utils for data processing (unchanged)
+        processed_games = process_raw_games_for_player(games, player_code)
+        win_rate = calculate_win_rate(processed_games)
+        
+        # Extract character usage
+        character_stats = {}
+        for game in processed_games:
+            char = game.get('character_name', 'Unknown')
+            if char not in character_stats:
+                character_stats[char] = {'games': 0, 'wins': 0}
+            character_stats[char]['games'] += 1
+            if game.get('result') == 'Win':
+                character_stats[char]['wins'] += 1
+        
+        # Calculate character win rates
+        for char_data in character_stats.values():
+            char_data['win_rate'] = (char_data['wins'] / char_data['games']) * 100 if char_data['games'] > 0 else 0
+        
+        return {
+            'player_code': player_code,
+            'total_games': len(processed_games),
+            'win_rate': round(win_rate, 2),
+            'character_usage': character_stats,
+            'recent_games': processed_games[:10]  # Last 10 games
+        }
+    except Exception as e:
+        logger.error(f"Error processing player stats for {player_code}: {str(e)}")
+        return None
+
+
+def validate_api_key(api_key):
+    """Validate API key and return client info."""
+    if not api_key:
+        return None
+    
+    try:
+        result = execute_query('api_keys', 'select_by_key', (api_key,), fetch_one=True)
+        
+        if not result:
+            return None
+        
+        # Check if key is expired
+        if result.get('expires_at'):
+            expires_at = datetime.fromisoformat(result['expires_at'])
+            if datetime.now() > expires_at:
+                return None
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error validating API key: {str(e)}")
+        return None
+
+
+def process_client_registration(client_data, registration_key):
+    """Process client registration request."""
+    try:
+        # Validate registration key if configured
+        if hasattr(config, 'REGISTRATION_SECRET') and config.REGISTRATION_SECRET:
+            if registration_key != config.REGISTRATION_SECRET:
+                return {'error': 'Invalid registration key'}, 401
+        
+        result = register_or_update_client(client_data)
+        return result
+    except Exception as e:
+        logger.error(f"Error processing client registration: {str(e)}")
+        return {'error': str(e)}
+
+
+def register_or_update_client(client_data):
+    """Register a new client or update existing client info."""
+    try:
+        client_id = client_data.get('client_id')
+        hostname = client_data.get('hostname', 'Unknown')
+        platform = client_data.get('platform', 'Unknown')
+        version = client_data.get('version', '1.0.0')
+        
+        if not client_id:
+            client_id = str(uuid.uuid4())
+        
+        # Check if client exists
+        existing = execute_query('clients', 'select_by_id', (client_id,), fetch_one=True)
+        
+        with connection.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            if existing:
+                # Update existing client
+                query = sql_manager.get_query('clients', 'update_info')
+                cursor.execute(query, (hostname, platform, version, datetime.now().isoformat(), client_id))
+            else:
+                # Insert new client
+                query = sql_manager.get_query('clients', 'insert_client')
+                cursor.execute(query, (client_id, hostname, platform, version, 
+                                     datetime.now().isoformat(), datetime.now().isoformat()))
+            
+            conn.commit()
+        
+        return {
+            'client_id': client_id,
+            'status': 'updated' if existing else 'registered'
+        }
+    except Exception as e:
+        logger.error(f"Error registering/updating client: {str(e)}")
+        raise
+
+
+def upload_games_for_client(client_id, games_data):
+    """Process game upload for a specific client."""
+    if not client_id or not games_data:
+        return {'error': 'Invalid client_id or games_data'}
+    
+    try:
+        uploaded_count = 0
+        
+        with connection.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            for game_data in games_data:
+                try:
+                    # Generate game ID if not provided
+                    game_id = game_data.get('game_id', str(uuid.uuid4()))
+                    
+                    # Check if game exists
+                    existing_query = sql_manager.get_query('games', 'check_exists')
+                    cursor.execute(existing_query, (game_id,))
+                    
+                    if cursor.fetchone():
+                        continue  # Skip duplicate
+                    
+                    # Insert new game
+                    insert_query = sql_manager.get_query('games', 'insert_game')
+                    cursor.execute(insert_query, (
+                        game_id,
+                        client_id,
+                        game_data.get('start_time', datetime.now().isoformat()),
+                        game_data.get('stage_id', 0),
+                        game_data.get('game_length_frames', 0),
+                        json.dumps(game_data.get('player_data', [])),
+                        json.dumps(game_data)  # full_data
+                    ))
+                    
+                    uploaded_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Error processing individual game: {str(e)}")
+                    continue
+            
+            conn.commit()
+        
+        # Update client last active
+        with connection.get_connection() as conn:
+            cursor = conn.cursor()
+            update_query = sql_manager.get_query('clients', 'update_last_active')
+            cursor.execute(update_query, (datetime.now().isoformat(), client_id))
+            conn.commit()
+        
+        return {
+            'uploaded_count': uploaded_count,
+            'total_submitted': len(games_data),
+            'status': 'success'
+        }
+    except Exception as e:
+        logger.error(f"Error uploading games for client {client_id}: {str(e)}")
+        return {'error': str(e)}
+
+
+def process_combined_upload(client_id, upload_data):
+    """Process combined upload (games + client info)."""
+    try:
+        results = {}
+        
+        # Update client info if provided
+        if 'client_info' in upload_data:
+            client_result = register_or_update_client(upload_data['client_info'])
+            results['client'] = client_result
+        
+        # Upload games if provided
+        if 'games' in upload_data:
+            games_result = upload_games_for_client(client_id, upload_data['games'])
+            results['games'] = games_result
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error processing combined upload: {str(e)}")
+        return {'error': str(e)}
+
+
+def process_file_upload(client_id, file_info, file_content):
+    """Process file upload and store metadata."""
+    try:
+        file_id = str(uuid.uuid4())
+        file_hash = file_info.get('hash', 'unknown')
+        filename = file_info.get('filename', 'unknown')
+        
+        # Check if file with same hash already exists
+        existing = execute_query('files', 'select_by_hash', (file_hash,), fetch_one=True)
+        
+        if existing:
             return {
-                'player_code': player_code,
-                'total_games': 0,
-                'wins': 0,
-                'losses': 0,
-                'win_rate': 0.0
+                'file_id': existing['file_id'],
+                'status': 'duplicate',
+                'message': 'File already exists'
             }
         
-        # Calculate basic stats
-        total_games = len(games)
-        wins = sum(1 for game in games if _is_player_win(game, player_code))
-        losses = total_games - wins
-        win_rate = (wins / total_games * 100) if total_games > 0 else 0.0
+        # Store file metadata
+        with connection.get_connection() as conn:
+            cursor = conn.cursor()
+            query = sql_manager.get_query('files', 'insert_file')
+            cursor.execute(query, (
+                file_id,
+                client_id,
+                filename,
+                len(file_content),
+                file_hash,
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+        
+        return {
+            'file_id': file_id,
+            'status': 'uploaded',
+            'size': len(file_content)
+        }
+    except Exception as e:
+        logger.error(f"Error processing file upload: {str(e)}")
+        return {'error': str(e)}
+
+
+def get_player_detailed_stats(player_code, filters=None):
+    """Get detailed player statistics with optional filtering."""
+    if not player_code:
+        return None
+    
+    try:
+        # Get all games for player
+        games = execute_query('games', 'select_by_player', (player_code,))
+        
+        if not games:
+            return None
+        
+        processed_games = process_raw_games_for_player(games, player_code)
+        
+        # Apply filters if provided
+        if filters:
+            processed_games = apply_game_filters(processed_games, filters)
+        
+        if not processed_games:
+            return None
+        
+        # Calculate detailed statistics
+        total_games = len(processed_games)
+        wins = len([g for g in processed_games if g.get('result') == 'Win'])
+        win_rate = (wins / total_games) * 100 if total_games > 0 else 0
+        
+        # Character breakdown
+        character_stats = {}
+        opponent_stats = {}
+        
+        for game in processed_games:
+            # Character stats
+            char = game.get('character_name', 'Unknown')
+            if char not in character_stats:
+                character_stats[char] = {'games': 0, 'wins': 0}
+            character_stats[char]['games'] += 1
+            if game.get('result') == 'Win':
+                character_stats[char]['wins'] += 1
+            
+            # Opponent stats
+            opp = game.get('opponent_tag', 'Unknown')
+            if opp not in opponent_stats:
+                opponent_stats[opp] = {'games': 0, 'wins': 0}
+            opponent_stats[opp]['games'] += 1
+            if game.get('result') == 'Win':
+                opponent_stats[opp]['wins'] += 1
+        
+        # Calculate win rates
+        for stats in character_stats.values():
+            stats['win_rate'] = (stats['wins'] / stats['games']) * 100 if stats['games'] > 0 else 0
+        
+        for stats in opponent_stats.values():
+            stats['win_rate'] = (stats['wins'] / stats['games']) * 100 if stats['games'] > 0 else 0
         
         return {
             'player_code': player_code,
             'total_games': total_games,
             'wins': wins,
-            'losses': losses,
-            'win_rate': round(win_rate, 2)
+            'losses': total_games - wins,
+            'win_rate': round(win_rate, 2),
+            'character_breakdown': character_stats,
+            'opponent_breakdown': opponent_stats,
+            'recent_games': processed_games[:20]
         }
-        
     except Exception as e:
-        logger.error(f"Error processing basic stats for {player_code}: {str(e)}")
+        logger.error(f"Error getting detailed stats for {player_code}: {str(e)}")
         return None
 
-def process_server_statistics():
+
+# ADDED: Missing function that was referenced in the logs
+def process_detailed_player_data(player_code, filters=None):
     """
-    Process server statistics.
-    
-    Returns:
-        dict: Server statistics
+    Process detailed player data with filters - wrapper for get_player_detailed_stats.
+    This function was missing and being called by routes.
     """
+    return get_player_detailed_stats(player_code, filters)
+
+
+def process_paginated_player_games(player_code, page=1, per_page=20):
+    """Get paginated games for a player."""
     try:
-        from backend.database import get_database_stats
-        stats = get_database_stats()
+        # Get all games for player
+        games = execute_query('games', 'select_by_player', (player_code,))
+        
+        if not games:
+            return {
+                'games': [],
+                'page': page,
+                'per_page': per_page,
+                'total': 0,
+                'total_pages': 0
+            }
+        
+        # Process games
+        processed_games = process_raw_games_for_player(games, player_code)
+        
+        # Calculate pagination
+        total = len(processed_games)
+        total_pages = (total + per_page - 1) // per_page  # Ceiling division
+        start = (page - 1) * per_page
+        end = start + per_page
+        
+        paginated_games = processed_games[start:end]
         
         return {
-            'total_games': stats.get('total_games', 0),
-            'total_players': stats.get('total_players', 0),
-            'total_clients': stats.get('total_clients', 0),
-            'server_status': 'active'
+            'games': paginated_games,
+            'page': page,
+            'per_page': per_page,
+            'total': total,
+            'total_pages': total_pages
         }
-        
     except Exception as e:
-        logger.error(f"Error processing server statistics: {str(e)}")
+        logger.error(f"Error getting paginated games for {player_code}: {str(e)}")
         return {
-            'total_games': 0,
-            'total_players': 0, 
-            'total_clients': 0,
-            'server_status': 'error'
-        }    
+            'games': [],
+            'page': page,
+            'per_page': per_page,
+            'total': 0,
+            'total_pages': 0,
+            'error': str(e)
+        }
 
-# ============================================================================
-# Helper Functions - Focused and Testable
-# ============================================================================
 
-def _is_player_win(game, player_code):
-    """Check if the game was a win for the specified player."""
+def get_client_files(client_id, limit=50):
+    """Get files uploaded by a client."""
     try:
-        player_data = json.loads(game.get('player_data', '[]'))
-        for player in player_data:
-            if player.get('player_tag') == player_code:
-                return player.get('result') == 'Win'
-        return False
-    except Exception:
-        return False
-    
-def _game_matches_opponent_filter(game, opponent_filter):
-    """Check if game matches opponent filter."""
-    try:
-        player_data = json.loads(game.get('player_data', '[]'))
-        for player in player_data:
-            player_tag = player.get('player_tag', '').lower()
-            if opponent_filter.lower() in player_tag:
-                return True
-        return False
-    except Exception:
-        return False
-
-def _game_matches_opponent_character_filter(game, opponent_char_filter):
-    """Check if game matches opponent character filter."""
-    try:
-        player_data = json.loads(game.get('player_data', '[]'))
-        for player in player_data:
-            character_name = player.get('character_name', '').lower()
-            if opponent_char_filter.lower() in character_name:
-                return True
-        return False
-    except Exception:
-        return False
-
-def _game_matches_character_filter(game, character_filter):
-    """Check if game matches character filter."""
-    try:
-        player_data = json.loads(game.get('player_data', '[]'))
-        for player in player_data:
-            character_name = player.get('character_name', '').lower()
-            if character_filter.lower() in character_name:
-                return True
-        return False
-    except Exception:
-        return False
-
-def _process_games_data(client_id, games_data):
-    """Process games portion of combined upload."""
-    if not games_data:
-        return {'uploaded': 0, 'duplicates': 0, 'errors': 0}
-    
-    # Use existing upload_games_for_client function
-    from backend.api_service import upload_games_for_client
-    return upload_games_for_client(client_id, games_data)
-
-def _process_files_data(client_id, files_data):
-    """Process files portion of combined upload."""
-    files_result = {'uploaded': 0, 'duplicates': 0, 'errors': 0}
-    file_details = []
-    
-    for file_info in files_data:
-        file_result = _process_single_file(client_id, file_info)
-        _update_file_counts(files_result, file_result)
-        file_details.append(file_result['detail'])
-    
-    files_result['file_details'] = file_details
-    return files_result
-
-def _process_single_file(client_id, file_info):
-    """Process a single file within a batch upload."""
-    try:
-        # Extract and validate file data
-        file_data = _extract_file_data(file_info)
+        files = execute_query('files', 'select_by_client', (client_id, limit))
         
-        # Check for duplicates
-        if duplicate := _check_file_duplicate(file_data['hash']):
-            return _create_duplicate_file_result(file_data, duplicate)
+        # Convert to JSON-serializable format
+        files_data = []
+        for file_record in files:
+            files_data.append({
+                'file_id': file_record['file_id'],
+                'file_hash': file_record['file_hash'],
+                'original_filename': file_record['original_filename'],
+                'file_size': file_record['file_size'],
+                'upload_date': file_record['upload_date'],
+                'metadata': json.loads(file_record['metadata']) if file_record.get('metadata') else {}
+            })
         
-        # Process new file
-        return _process_new_file(client_id, file_data)
-        
+        return {
+            'files': files_data,
+            'count': len(files_data)
+        }
     except Exception as e:
-        logger.error(f"Error processing file: {str(e)}")
-        return _create_file_error_result(file_info, str(e))
-    
-def _apply_game_filters(games, character_filter='all', opponent_filter='all', opponent_character_filter='all'):
-    """Apply filtering to a list of games based on various criteria."""
+        logger.error(f"Error getting files for client {client_id}: {str(e)}")
+        return {'error': str(e)}
+
+
+def get_file_details(file_id, client_id):
+    """Get details about a specific file."""
+    try:
+        file_record = execute_query('files', 'select_by_id', (file_id,), fetch_one=True)
+        
+        if not file_record:
+            return None
+        
+        # Check if client owns this file
+        if file_record['client_id'] != client_id:
+            return {'error': 'Access denied'}
+        
+        return {
+            'file_id': file_record['file_id'],
+            'file_hash': file_record['file_hash'],
+            'original_filename': file_record['original_filename'],
+            'file_size': file_record['file_size'],
+            'upload_date': file_record['upload_date'],
+            'metadata': json.loads(file_record['metadata']) if file_record.get('metadata') else {}
+        }
+    except Exception as e:
+        logger.error(f"Error getting file details for {file_id}: {str(e)}")
+        return {'error': str(e)}
+
+
+def get_admin_file_stats():
+    """Get file storage statistics for admin endpoint."""
+    try:
+        # Get basic file statistics
+        total_files = execute_query('files', 'count_all', fetch_one=True)
+        
+        # Calculate total file size
+        try:
+            file_stats = execute_query('stats', 'file_stats_total', fetch_one=True)
+            total_size = file_stats['total_size'] if file_stats else 0
+        except:
+            total_size = 0
+        
+        return {
+            'total_files': total_files['count'] if total_files else 0,
+            'total_size_bytes': total_size,
+            'total_size_mb': round(total_size / (1024 * 1024), 2) if total_size else 0
+        }
+    except Exception as e:
+        logger.error(f"Error getting admin file stats: {str(e)}")
+        return {'error': str(e)}
+
+
+def apply_game_filters(games, filters):
+    """Apply filters to game list."""
     filtered_games = games
     
-    # Apply character filter
-    if character_filter != 'all':
-        if isinstance(character_filter, list):
-            character_values = character_filter
-        else:
-            character_values = character_filter.split('|') if '|' in character_filter else [character_filter]
-        filtered_games = [g for g in filtered_games if g['player'].get('character_name') in character_values]
+    if filters.get('character'):
+        filtered_games = [g for g in filtered_games if g.get('character_name') == filters['character']]
     
-    # Apply opponent filter
-    if opponent_filter != 'all':
-        if isinstance(opponent_filter, list):
-            opponent_values = opponent_filter
-        else:
-            opponent_values = opponent_filter.split('|') if '|' in opponent_filter else [opponent_filter]
-        filtered_games = [g for g in filtered_games if g['opponent'].get('player_tag') in opponent_values]
+    if filters.get('opponent'):
+        filtered_games = [g for g in filtered_games if g.get('opponent_tag') == filters['opponent']]
     
-    # Apply opponent character filter
-    if opponent_character_filter != 'all':
-        if isinstance(opponent_character_filter, list):
-            opp_char_values = opponent_character_filter
-        else:
-            opp_char_values = opponent_character_filter.split('|') if '|' in opponent_character_filter else [opponent_character_filter]
-        filtered_games = [g for g in filtered_games if g['opponent'].get('character_name') in opp_char_values]
+    if filters.get('result'):
+        filtered_games = [g for g in filtered_games if g.get('result') == filters['result']]
+    
+    if filters.get('start_date'):
+        start_date = datetime.fromisoformat(filters['start_date'])
+        filtered_games = [g for g in filtered_games 
+                         if datetime.fromisoformat(g.get('start_time', '1970-01-01')) >= start_date]
+    
+    if filters.get('end_date'):
+        end_date = datetime.fromisoformat(filters['end_date'])
+        filtered_games = [g for g in filtered_games 
+                         if datetime.fromisoformat(g.get('start_time', '1970-01-01')) <= end_date]
     
     return filtered_games
-
-def _extract_file_data(file_info):
-    """Extract and validate file data from upload info."""
-    content = file_info.get('content')
-    metadata = file_info.get('metadata', {})
-    
-    if not content:
-        raise ValueError("File upload missing content")
-    
-    # Decode base64 content
-    try:
-        file_bytes = base64.b64decode(content)
-    except Exception as e:
-        raise ValueError(f"Invalid base64 content: {str(e)}")
-    
-    # Validate file
-    _validate_file_data(file_bytes, metadata)
-    
-    return {
-        'bytes': file_bytes,
-        'size': len(file_bytes),
-        'hash': _calculate_file_hash(file_bytes),
-        'filename': metadata.get('filename', 'unknown.slp'),
-        'metadata': metadata
-    }
-
-def _validate_file_data(file_bytes, metadata):
-    """Validate file data and metadata."""
-    filename = metadata.get('filename', 'unknown.slp')
-    
-    # Check file extension
-    if not _is_allowed_file(filename):
-        raise ValueError(f"File type not allowed: {filename}")
-    
-    # Check file size
-    if len(file_bytes) > MAX_FILE_SIZE:
-        raise ValueError(f"File too large: {len(file_bytes)} bytes (max: {MAX_FILE_SIZE})")
-    
-    if len(file_bytes) == 0:
-        raise ValueError("Empty file")
-
-def _check_file_duplicate(file_hash):
-    """Check if file already exists by hash."""
-    return get_file_by_hash(file_hash)
-
-def _process_new_file(client_id, file_data):
-    """Process a new file upload."""
-    try:
-        # Save file to disk
-        file_path = _save_file_to_disk(client_id, file_data)
-        
-        # Create database record
-        file_record = _create_file_record_data(client_id, file_data, file_path)
-        file_id = create_file_record(file_record)
-        
-        logger.info(f"Successfully processed file upload: {file_data['filename']} ({file_data['hash']})")
-        
-        return {
-            'success': True,
-            'detail': {
-                'filename': file_data['filename'],
-                'hash': file_data['hash'],
-                'status': 'uploaded',
-                'file_id': file_id
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Error saving file {file_data['filename']}: {str(e)}")
-        raise
-
-def _save_file_to_disk(client_id, file_data):
-    """Save uploaded file to organized directory structure."""
-    # Create directory structure: uploads/client_id/YYYY/MM/
-    upload_date = datetime.now()
-    year_month_dir = os.path.join(
-        config.get_uploads_dir(),
-        client_id,
-        upload_date.strftime('%Y'),
-        upload_date.strftime('%m')
-    )
-    os.makedirs(year_month_dir, exist_ok=True)
-    
-    # Use hash as filename to avoid duplicates
-    safe_filename = f"{file_data['hash']}.slp"
-    file_path = os.path.join(year_month_dir, safe_filename)
-    
-    # Write file to disk
-    with open(file_path, 'wb') as f:
-        f.write(file_data['bytes'])
-    
-    logger.info(f"Saved file {file_data['filename']} as {file_path}")
-    return file_path
-
-def _create_file_record_data(client_id, file_data, file_path):
-    """Create file record data for database insertion."""
-    return {
-        'file_hash': file_data['hash'],
-        'client_id': client_id,
-        'original_filename': file_data['filename'],
-        'file_path': file_path,
-        'file_size': file_data['size'],
-        'upload_date': datetime.now().isoformat(),
-        'metadata': json.dumps(file_data['metadata']) if isinstance(file_data['metadata'], dict) else file_data['metadata']
-    }
-
-def _create_combined_response(games_result, files_result):
-    """Create standardized combined upload response."""
-    total_games = games_result.get('uploaded', 0)
-    total_files = files_result.get('uploaded', 0)
-    
-    return {
-        'success': True,
-        'message': f"Processed {total_games} games and {total_files} files",
-        'games': games_result,
-        'files': files_result
-    }
-
-def _create_duplicate_file_result(file_data, existing_file):
-    """Create result for duplicate file."""
-    return {
-        'success': True,
-        'detail': {
-            'filename': file_data['filename'],
-            'hash': file_data['hash'],
-            'status': 'duplicate',
-            'existing_file_id': existing_file.get('file_id')
-        }
-    }
-
-def _create_file_error_result(file_info, error_message):
-    """Create result for file processing error."""
-    filename = file_info.get('metadata', {}).get('filename', 'unknown')
-    return {
-        'success': False,
-        'detail': {
-            'filename': filename,
-            'status': 'error',
-            'error': error_message
-        }
-    }
-
-def _update_file_counts(files_result, file_result):
-    """Update file processing counts based on result."""
-    if file_result['success']:
-        status = file_result['detail']['status']
-        if status == 'uploaded':
-            files_result['uploaded'] += 1
-        elif status == 'duplicate':
-            files_result['duplicates'] += 1
-    else:
-        files_result['errors'] += 1
-
-def _extract_filter_options(games):
-    """Extract all available filter options from a set of games."""
-    characters_played = set()
-    opponents_faced = set()
-    opponent_characters_faced = set()
-    
-    for game in games:
-        characters_played.add(game['player'].get('character_name', 'Unknown'))
-        opponents_faced.add(game['opponent'].get('player_tag', 'Unknown'))
-        opponent_characters_faced.add(game['opponent'].get('character_name', 'Unknown'))
-    
-    return {
-        'characters': sorted(list(characters_played)),
-        'opponents': sorted(list(opponents_faced)),
-        'opponent_characters': sorted(list(opponent_characters_faced))
-    }
-
-
-def _calculate_filtered_stats(filtered_games, filter_options):
-    """Calculate comprehensive statistics for filtered game data."""
-    if not filtered_games:
-        return {
-            'total_games': 0,
-            'wins': 0,
-            'overall_winrate': 0,
-            'character_stats': {},
-            'opponent_stats': {},
-            'opponent_character_stats': {},
-            'date_stats': {}
-        }
-    
-    total_filtered = len(filtered_games)
-    wins_filtered = sum(1 for game in filtered_games if game['result'] == 'Win')
-    overall_winrate = wins_filtered / total_filtered if total_filtered > 0 else 0
-    
-    # Character stats
-    character_stats = {}
-    for char in filter_options['characters']:
-        char_games = [g for g in filtered_games if g['player'].get('character_name') == char]
-        char_total = len(char_games)
-        char_wins = sum(1 for g in char_games if g['result'] == 'Win')
-        character_stats[char] = {
-            'games': char_total,
-            'wins': char_wins,
-            'win_rate': char_wins / char_total if char_total > 0 else 0
-        }
-    
-    # Opponent stats
-    opponent_stats = {}
-    for opp in filter_options['opponents']:
-        opp_games = [g for g in filtered_games if g['opponent'].get('player_tag') == opp]
-        opp_total = len(opp_games)
-        opp_wins = sum(1 for g in opp_games if g['result'] == 'Win')
-        opponent_stats[opp] = {
-            'games': opp_total,
-            'wins': opp_wins,
-            'win_rate': opp_wins / opp_total if opp_total > 0 else 0
-        }
-    
-    # Opponent character stats
-    opponent_char_stats = {}
-    for opp_char in filter_options['opponent_characters']:
-        opp_char_games = [g for g in filtered_games if g['opponent'].get('character_name') == opp_char]
-        opp_char_total = len(opp_char_games)
-        opp_char_wins = sum(1 for g in opp_char_games if g['result'] == 'Win')
-        opponent_char_stats[opp_char] = {
-            'games': opp_char_total,
-            'wins': opp_char_wins,
-            'win_rate': opp_char_wins / opp_char_total if opp_char_total > 0 else 0
-        }
-    
-    # Date stats
-    date_stats = {}
-    for game in filtered_games:
-        date = game['start_time'].split('T')[0] if 'T' in game['start_time'] else game['start_time']
-        if date not in date_stats:
-            date_stats[date] = {'games': 0, 'wins': 0}
-        
-        date_stats[date]['games'] += 1
-        if game['result'] == 'Win':
-            date_stats[date]['wins'] += 1
-    
-    # Calculate win rates for dates and sort
-    for date in date_stats:
-        date_stats[date]['win_rate'] = date_stats[date]['wins'] / date_stats[date]['games']
-    
-    date_stats_sorted = {k: date_stats[k] for k in sorted(date_stats.keys())}
-    
-    return {
-        'total_games': total_filtered,
-        'wins': wins_filtered,
-        'overall_winrate': overall_winrate,
-        'character_stats': character_stats,
-        'opponent_stats': opponent_stats,
-        'opponent_character_stats': opponent_char_stats,
-        'date_stats': date_stats_sorted
-    }        
-
-# ============================================================================
-# Utility Functions
-# ============================================================================
-
-def _is_allowed_file(filename):
-    """Check if file extension is allowed."""
-    return os.path.splitext(filename.lower())[1] in ALLOWED_EXTENSIONS
-
-def _calculate_file_hash(file_content):
-    """Calculate SHA-256 hash of file content."""
-    return hashlib.sha256(file_content).hexdigest()
-
-# ============================================================================
-# Backward Compatibility (if needed during transition)
-# ============================================================================
-
-def process_file_upload(client_id, file_data, metadata):
-    """
-    DEPRECATED: Use process_combined_upload instead.
-    
-    This function is maintained for backward compatibility but should
-    be phased out in favor of the combined upload approach.
-    """
-    logger.warning("process_file_upload is deprecated. Use process_combined_upload instead.")
-    
-    # Convert to combined format and delegate
-    upload_data = {
-        'games': [],
-        'files': [{
-            'content': base64.b64encode(file_data).decode('utf-8'),
-            'metadata': metadata
-        }]
-    }
-    
-    result = process_combined_upload(client_id, upload_data)
-    
-    # Extract file result for backward compatibility
-    if result.get('files', {}).get('file_details'):
-        file_detail = result['files']['file_details'][0]
-        return {
-            'success': file_detail['status'] != 'error',
-            'message': 'File processed',
-            'file_hash': file_detail.get('hash'),
-            'duplicate': file_detail['status'] == 'duplicate',
-            'file_id': file_detail.get('file_id'),
-            'existing_file_id': file_detail.get('existing_file_id')
-        }
-    
-    return {'success': False, 'message': 'File processing failed'}

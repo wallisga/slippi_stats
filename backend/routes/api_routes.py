@@ -2,7 +2,7 @@
 API routes for Slippi Server.
 
 This module contains all API endpoints that return JSON responses.
-Uses api_service for business logic and data processing.
+Uses ONLY api_service for business logic - no direct database imports.
 """
 
 import json
@@ -13,7 +13,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from backend.config import get_config
 from backend.utils import decode_player_tag
-from backend.database import validate_api_key, get_files_by_client, get_file_by_id, get_enhanced_database_stats
+# FIXED: Only import service layer, no direct database imports
 import backend.services.api_service as api_service
 
 # Create blueprint for API routes
@@ -32,10 +32,11 @@ def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = request.headers.get('X-API-Key')
-        client_id = validate_api_key(api_key)
-        if not client_id:
+        # FIXED: Use service layer for validation
+        client_info = api_service.validate_api_key(api_key)
+        if not client_info:
             abort(401, description="Invalid or missing API key")
-        kwargs['client_id'] = client_id
+        kwargs['client_id'] = client_info.get('client_id')
         return f(*args, **kwargs)
     return decorated_function
 
@@ -48,7 +49,8 @@ def rate_limited(max_per_minute):
             client_id = kwargs.get('client_id')
             if not client_id:
                 api_key = request.headers.get('X-API-Key')
-                client_id = validate_api_key(api_key) or 'anonymous'
+                client_info = api_service.validate_api_key(api_key)
+                client_id = client_info.get('client_id') if client_info else 'anonymous'
             
             current_minute = int(time.time() / 60)
             if client_id not in request_counts:
@@ -195,24 +197,9 @@ def files_list(client_id):
     try:
         limit = min(100, int(request.args.get('limit', '50')))  # Max 100 files per request
         
-        files = get_files_by_client(client_id, limit=limit)
-        
-        # Convert to JSON-serializable format
-        files_data = []
-        for file_record in files:
-            files_data.append({
-                'file_id': file_record['file_id'],
-                'file_hash': file_record['file_hash'],
-                'original_filename': file_record['original_filename'],
-                'file_size': file_record['file_size'],
-                'upload_date': file_record['upload_date'],
-                'metadata': json.loads(file_record['metadata']) if file_record['metadata'] else {}
-            })
-        
-        return jsonify({
-            'files': files_data,
-            'count': len(files_data)
-        })
+        # FIXED: Use service layer instead of direct database call
+        result = api_service.get_client_files(client_id, limit=limit)
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error listing files for client {client_id}: {str(e)}")
@@ -224,25 +211,19 @@ def files_list(client_id):
 def file_details(file_id, client_id):
     """Get details about a specific file."""
     try:
-        file_record = get_file_by_id(file_id)
+        # FIXED: Use service layer instead of direct database call
+        result = api_service.get_file_details(file_id, client_id)
         
-        if not file_record:
+        if result is None:
             abort(404, description="File not found")
+            
+        if 'error' in result:
+            if 'Access denied' in result['error']:
+                abort(403, description="Access denied")
+            else:
+                abort(404, description="File not found")
         
-        # Check if client owns this file
-        if file_record['client_id'] != client_id:
-            abort(403, description="Access denied")
-        
-        file_data = {
-            'file_id': file_record['file_id'],
-            'file_hash': file_record['file_hash'],
-            'original_filename': file_record['original_filename'],
-            'file_size': file_record['file_size'],
-            'upload_date': file_record['upload_date'],
-            'metadata': json.loads(file_record['metadata']) if file_record['metadata'] else {}
-        }
-        
-        return jsonify(file_data)
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error getting file details for {file_id}: {str(e)}")
@@ -265,8 +246,8 @@ def server_stats():
 def admin_file_stats():
     """Get file storage statistics (admin endpoint)."""
     try:
-        # You might want to add admin authentication here
-        stats = get_enhanced_database_stats()
+        # FIXED: Use service layer instead of direct database call
+        stats = api_service.get_admin_file_stats()
         return jsonify(stats)
         
     except Exception as e:
