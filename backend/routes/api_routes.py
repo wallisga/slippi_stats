@@ -5,7 +5,6 @@ This module contains all API endpoints that return JSON responses.
 Uses ONLY api_service for business logic - no direct database imports.
 """
 
-import json
 import time
 from functools import wraps
 from flask import Blueprint, request, jsonify, abort
@@ -13,8 +12,12 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from backend.config import get_config
 from backend.utils import decode_player_tag
-# FIXED: Only import service layer, no direct database imports
 import backend.services.api_service as api_service
+from backend.services import (
+    process_combined_upload,
+    upload_games_for_client, 
+    process_file_upload
+)
 
 # Create blueprint for API routes
 api_bp = Blueprint('api', __name__)
@@ -147,7 +150,7 @@ def games_upload(client_id):
     """
     try:
         upload_data = _validate_upload_request()
-        result = api_service.process_combined_upload(client_id, upload_data)
+        result = process_combined_upload(client_id, upload_data)
         return jsonify(result)
         
     except (RequestEntityTooLarge, ValueError) as e:

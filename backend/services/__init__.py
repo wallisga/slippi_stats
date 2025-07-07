@@ -1,24 +1,28 @@
-# backend/services/__init__.py
-"""
-Service Layer Package
+"""Service Layer Package - UPDATED with Upload Domain"""
 
-Business logic services implementing the orchestrator pattern for
-maintainable, testable code.
-"""
-
-# Import main services for backward compatibility
+# Import from existing services (backward compatibility)
 from .api_service import *
 from .web_service import *
 
+# Import from new upload domain
+from .upload import (
+    process_combined_upload,
+    upload_games_for_client,
+    process_file_upload
+)
+
 __all__ = [
-    # API Service functions
+    # Upload domain functions (NEW)
     'process_combined_upload',
+    'upload_games_for_client', 
+    'process_file_upload',
+    
+    # Existing API Service functions (keeping current exports)
     'process_detailed_player_data', 
     'process_player_basic_stats',
     'register_or_update_client',
-    'upload_games_for_client',
     
-    # Web Service functions  
+    # Existing Web Service functions  
     'prepare_homepage_data',
     'prepare_all_players_data',
     'process_player_profile_request',

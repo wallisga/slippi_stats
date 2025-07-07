@@ -7,19 +7,13 @@ Updated to use the new backend/db/ layer instead of backend.database
 
 import logging
 import json
-import secrets
 import uuid
-from datetime import datetime, timedelta
-from flask import abort
+from datetime import datetime
 
 # NEW: Use the simplified db layer
 from backend.db import execute_query, connection, sql_manager
 from backend.utils import (
-    encode_player_tag, decode_player_tag, get_error_template_data,
-    parse_player_data_from_game, find_player_in_game_data,
-    safe_get_player_field, process_raw_games_for_player,
-    find_flexible_player_matches, extract_player_stats_from_games,
-    process_recent_games_data, calculate_win_rate
+    process_raw_games_for_player
 )
 from backend.config import get_config
 
@@ -168,127 +162,6 @@ def register_or_update_client(client_data):
         logger.error(f"Error registering/updating client: {str(e)}")
         raise
 
-
-def upload_games_for_client(client_id, games_data):
-    """Process game upload for a specific client."""
-    if not client_id or not games_data:
-        return {'error': 'Invalid client_id or games_data'}
-    
-    try:
-        uploaded_count = 0
-        
-        with connection.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            for game_data in games_data:
-                try:
-                    # Generate game ID if not provided
-                    game_id = game_data.get('game_id', str(uuid.uuid4()))
-                    
-                    # Check if game exists
-                    existing_query = sql_manager.get_query('games', 'check_exists')
-                    cursor.execute(existing_query, (game_id,))
-                    
-                    if cursor.fetchone():
-                        continue  # Skip duplicate
-                    
-                    # Insert new game
-                    insert_query = sql_manager.get_query('games', 'insert_game')
-                    cursor.execute(insert_query, (
-                        game_id,
-                        client_id,
-                        game_data.get('start_time', datetime.now().isoformat()),
-                        game_data.get('stage_id', 0),
-                        game_data.get('game_length_frames', 0),
-                        json.dumps(game_data.get('player_data', [])),
-                        json.dumps(game_data)  # full_data
-                    ))
-                    
-                    uploaded_count += 1
-                    
-                except Exception as e:
-                    logger.warning(f"Error processing individual game: {str(e)}")
-                    continue
-            
-            conn.commit()
-        
-        # Update client last active
-        with connection.get_connection() as conn:
-            cursor = conn.cursor()
-            update_query = sql_manager.get_query('clients', 'update_last_active')
-            cursor.execute(update_query, (datetime.now().isoformat(), client_id))
-            conn.commit()
-        
-        return {
-            'uploaded_count': uploaded_count,
-            'total_submitted': len(games_data),
-            'status': 'success'
-        }
-    except Exception as e:
-        logger.error(f"Error uploading games for client {client_id}: {str(e)}")
-        return {'error': str(e)}
-
-
-def process_combined_upload(client_id, upload_data):
-    """Process combined upload (games + client info)."""
-    try:
-        results = {}
-        
-        # Update client info if provided
-        if 'client_info' in upload_data:
-            client_result = register_or_update_client(upload_data['client_info'])
-            results['client'] = client_result
-        
-        # Upload games if provided
-        if 'games' in upload_data:
-            games_result = upload_games_for_client(client_id, upload_data['games'])
-            results['games'] = games_result
-        
-        return results
-    except Exception as e:
-        logger.error(f"Error processing combined upload: {str(e)}")
-        return {'error': str(e)}
-
-
-def process_file_upload(client_id, file_info, file_content):
-    """Process file upload and store metadata."""
-    try:
-        file_id = str(uuid.uuid4())
-        file_hash = file_info.get('hash', 'unknown')
-        filename = file_info.get('filename', 'unknown')
-        
-        # Check if file with same hash already exists
-        existing = execute_query('files', 'select_by_hash', (file_hash,), fetch_one=True)
-        
-        if existing:
-            return {
-                'file_id': existing['file_id'],
-                'status': 'duplicate',
-                'message': 'File already exists'
-            }
-        
-        # Store file metadata
-        with connection.get_connection() as conn:
-            cursor = conn.cursor()
-            query = sql_manager.get_query('files', 'insert_file')
-            cursor.execute(query, (
-                file_id,
-                client_id,
-                filename,
-                len(file_content),
-                file_hash,
-                datetime.now().isoformat()
-            ))
-            conn.commit()
-        
-        return {
-            'file_id': file_id,
-            'status': 'uploaded',
-            'size': len(file_content)
-        }
-    except Exception as e:
-        logger.error(f"Error processing file upload: {str(e)}")
-        return {'error': str(e)}
 
 def get_player_detailed_stats(player_code, filters=None):
     """Get detailed player statistics with optional filtering - FIXED RESPONSE FORMAT."""

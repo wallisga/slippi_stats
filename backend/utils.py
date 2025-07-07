@@ -6,7 +6,6 @@ Only includes functions that are actually being used in the codebase.
 import urllib.parse
 import json
 import logging
-from datetime import datetime
 
 # Get logger
 logger = logging.getLogger('SlippiServer')

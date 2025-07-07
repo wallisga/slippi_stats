@@ -8,7 +8,7 @@ This module contains all web page routes that serve HTML templates.
 Uses web_service for business logic and data preparation.
 """
 
-from flask import Blueprint, render_template, redirect
+from flask import Blueprint, render_template
 import backend.services.web_service as web_service
 
 # Create blueprint for web routes

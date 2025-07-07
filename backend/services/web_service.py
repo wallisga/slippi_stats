@@ -6,16 +6,11 @@ FINAL VERSION: Now properly handles character data and names
 
 import logging
 from flask import abort
-from datetime import datetime
 
 # NEW: Use the simplified db layer
-from backend.db import execute_query, connection, sql_manager
+from backend.db import execute_query
 from backend.utils import (
-    encode_player_tag, decode_player_tag, get_error_template_data,
-    parse_player_data_from_game, find_player_in_game_data,
-    safe_get_player_field, process_raw_games_for_player,
-    find_flexible_player_matches, extract_player_stats_from_games,
-    process_recent_games_data, calculate_win_rate
+    encode_player_tag, decode_player_tag, safe_get_player_field, process_raw_games_for_player
 )
 from backend.config import get_config
 
@@ -137,16 +132,11 @@ def prepare_homepage_data():
 import logging
 import json
 from flask import abort
-from datetime import datetime
 
 # NEW: Use the simplified db layer
-from backend.db import execute_query, connection, sql_manager
+from backend.db import execute_query
 from backend.utils import (
-    encode_player_tag, decode_player_tag, get_error_template_data,
-    parse_player_data_from_game, find_player_in_game_data,
-    safe_get_player_field, process_raw_games_for_player,
-    find_flexible_player_matches, extract_player_stats_from_games,
-    process_recent_games_data, calculate_win_rate
+    encode_player_tag, decode_player_tag, safe_get_player_field, process_raw_games_for_player
 )
 from backend.config import get_config
 
