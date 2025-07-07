@@ -30,11 +30,8 @@ def prepare_homepage_data():
         # Get basic counts
         total_games = execute_query('games', 'count_all', fetch_one=True)
         
-        # Try the new count_unique_players, fallback to unique_players
-        try:
-            total_players = execute_query('stats', 'count_unique_players', fetch_one=True)
-        except:
-            total_players = execute_query('stats', 'unique_players', fetch_one=True)
+        # Try the new count_unique_players
+        total_players = execute_query('stats', 'count_unique_players', fetch_one=True)
         
         # Get raw recent games
         recent_games_raw = execute_query('games', 'select_recent', (10,))
@@ -157,10 +154,7 @@ def prepare_homepage_data():
         total_games = execute_query('games', 'count_all', fetch_one=True)
         
         # Try the new count_unique_players, fallback to unique_players
-        try:
-            total_players = execute_query('stats', 'count_unique_players', fetch_one=True)
-        except:
-            total_players = execute_query('stats', 'unique_players', fetch_one=True)
+        total_players = execute_query('stats', 'count_unique_players', fetch_one=True)
         
         # Get raw recent games
         recent_games_raw = execute_query('games', 'select_recent', (10,))
