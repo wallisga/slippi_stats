@@ -320,12 +320,192 @@ def get_player_detailed_stats(player_code, filters=None):
         logger.error(f"Error getting detailed stats for {player_code}: {str(e)}")
         return None
 
-def process_detailed_player_data(player_code, filters=None):
+def process_detailed_player_data(player_code, character='all', opponent='all', stage='all', limit=100, opponent_character='all'):
     """
-    Process detailed player data with filters - wrapper for get_player_detailed_stats.
-    This function was missing and being called by routes.
+    Process detailed player data with comprehensive filtering.
+    
+    UPDATED: Added opponent_character parameter to match frontend expectations.
+    The frontend JavaScript sends this filter and expects it to work.
+    
+    Args:
+        player_code (str): Player tag to analyze
+        character (str): Filter by player's character (default: 'all')
+        opponent (str): Filter by opponent player tag (default: 'all') 
+        stage (str): Filter by stage (default: 'all')
+        limit (int): Maximum number of games to return (default: 100)
+        opponent_character (str): Filter by opponent's character (default: 'all') - NEW
+    
+    Returns:
+        dict: Comprehensive player analysis with filtered data
+        
+    Example frontend call:
+        POST /api/player/TEST%23123/detailed
+        {
+            "character": "Fox",
+            "opponent": "all", 
+            "opponent_character": "Falco",
+            "stage": "all",
+            "limit": 50
+        }
     """
-    return get_player_detailed_stats(player_code, filters)
+    try:
+        logger.info(f"🔍 Processing detailed player data for: {player_code}")
+        logger.info(f"   📊 Filters - Character: {character}, Opponent: {opponent}, OpponentChar: {opponent_character}, Stage: {stage}, Limit: {limit}")
+        
+        # Validate input parameters
+        validated_data = _validate_detailed_player_inputs(player_code, character, opponent, stage, limit, opponent_character)
+        
+        # Get base player data
+        player_games = _get_player_games_for_analysis(validated_data['player_code'])
+        
+        # Apply all filters including opponent_character
+        filtered_games = _apply_comprehensive_filters(
+            player_games, 
+            validated_data['character'], 
+            validated_data['opponent'], 
+            validated_data['stage'],
+            validated_data['opponent_character']  # NEW: Include opponent character filter
+        )
+        
+        # Limit results
+        limited_games = filtered_games[:validated_data['limit']]
+        
+        # Calculate comprehensive statistics
+        analysis_result = _calculate_comprehensive_analysis(filtered_games, player_code)
+        
+        # Add filter metadata for frontend
+        analysis_result['applied_filters'] = {
+            'character': character,
+            'opponent': opponent,
+            'opponent_character': opponent_character,  # NEW: Include in response
+            'stage': stage,
+            'limit': limit
+        }
+        
+        # Add filter options for frontend dropdowns/checkboxes
+        analysis_result['filter_options'] = _generate_filter_options(player_games)
+        
+        return analysis_result
+        
+    except Exception as e:
+        logger.error(f"Error processing detailed player data for {player_code}: {str(e)}")
+        raise
+
+def _validate_detailed_player_inputs(player_code, character, opponent, stage, limit, opponent_character):
+    """Validate all input parameters including new opponent_character."""
+    if not player_code:
+        raise ValueError("Player code is required")
+    
+    # Validate limit
+    if not isinstance(limit, int) or limit < 1:
+        limit = 100
+    elif limit > 1000:  # Prevent excessive queries
+        limit = 1000
+    
+    return {
+        'player_code': player_code,
+        'character': character or 'all',
+        'opponent': opponent or 'all',
+        'stage': stage or 'all',
+        'limit': limit,
+        'opponent_character': opponent_character or 'all'  # NEW: Include opponent character
+    }
+
+def _apply_comprehensive_filters(games, character_filter, opponent_filter, stage_filter, opponent_character_filter):
+    """
+    Apply all filters to the game list.
+    
+    FIXED: Use correct data structure for character access.
+    """
+    filtered_games = games
+    initial_count = len(filtered_games)
+    
+    logger.info(f"   📊 Starting with {initial_count} games, applying filters...")
+    
+    # FILTER 1: Player Character - FIXED data access
+    if character_filter and character_filter != 'all':
+        before_count = len(filtered_games)
+        filtered_games = [
+            g for g in filtered_games 
+            if filter_matches(character_filter, g.get('player', {}).get('character_name', 'Unknown'), 'character')
+        ]
+        after_count = len(filtered_games)
+        logger.info(f"   📊 Character filter: {before_count} → {after_count} games ({character_filter})")
+    
+    # FILTER 2: Opponent Tag  
+    if opponent_filter and opponent_filter != 'all':
+        before_count = len(filtered_games)
+        filtered_games = [
+            g for g in filtered_games 
+            if filter_matches(opponent_filter, g.get('opponent', {}).get('player_tag', 'Unknown'), 'opponent_tag')
+        ]
+        after_count = len(filtered_games)
+        logger.info(f"   📊 Opponent filter: {before_count} → {after_count} games ({opponent_filter})")
+    
+    # FILTER 3: Opponent Character
+    if opponent_character_filter and opponent_character_filter != 'all':
+        before_count = len(filtered_games)
+        filtered_games = [
+            g for g in filtered_games 
+            if filter_matches(opponent_character_filter, g.get('opponent', {}).get('character_name', 'Unknown'), 'opponent_char')
+        ]
+        after_count = len(filtered_games)
+        logger.info(f"   📊 Opponent character filter: {before_count} → {after_count} games ({opponent_character_filter})")
+    
+    # FILTER 4: Stage
+    if stage_filter and stage_filter != 'all':
+        before_count = len(filtered_games)
+        filtered_games = [
+            g for g in filtered_games 
+            if filter_matches(stage_filter, str(g.get('stage_id', 'Unknown')), 'stage')
+        ]
+        after_count = len(filtered_games)
+        logger.info(f"   📊 Stage filter: {before_count} → {after_count} games ({stage_filter})")
+    
+    final_count = len(filtered_games)
+    logger.info(f"   ✅ Final result: {initial_count} → {final_count} games after all filters")
+    
+    return filtered_games
+
+def _generate_filter_options(all_games):
+    """
+    Generate filter options for frontend dropdowns/checkboxes.
+    
+    FIXED: Use correct data structure for character access.
+    """
+    characters = set()
+    opponents = set()
+    opponent_characters = set()
+    stages = set()
+    
+    for game in all_games:
+        # FIXED: Player characters - use correct nested structure
+        char = game.get('player', {}).get('character_name')
+        if char and char != 'Unknown':
+            characters.add(char)
+        
+        # Opponent info
+        opponent = game.get('opponent', {})
+        opp_tag = opponent.get('player_tag')
+        if opp_tag and opp_tag != 'Unknown':
+            opponents.add(opp_tag)
+        
+        # FIXED: Opponent characters - use correct nested structure
+        opp_char = opponent.get('character_name')
+        if opp_char and opp_char != 'Unknown':
+            opponent_characters.add(opp_char)
+        
+        # Stages
+        stage = game.get('stage_name', game.get('stage_id'))
+        if stage and stage != 'Unknown':
+            stages.add(str(stage))
+    
+    return {
+        'characters': sorted(list(characters)),
+        'opponents': sorted(list(opponents)),
+        'opponent_characters': sorted(list(opponent_characters)),
+        'stages': sorted(list(stages))
+    }
 
 
 def process_paginated_player_games(player_code, page=1, per_page=20):
@@ -446,14 +626,14 @@ def get_admin_file_stats():
         logger.error(f"Error getting admin file stats: {str(e)}")
         return {'error': str(e)}
 
+# CRITICAL FIX: Replace the apply_game_filters function in your api_service.py
+
 def apply_game_filters(games, filters):
     """
     Apply filters to a list of processed games using AND logic.
     
-    A game must match ALL specified filters to be included:
-    - Player character must be in the selected characters (if specified)
-    - Opponent tag must be in the selected opponents (if specified)  
-    - Opponent character must be in the selected opponent characters (if specified)
+    FIXED: Use correct data structure for character access.
+    The games come from process_raw_games_for_player which creates nested structure.
     
     Args:
         games (list): List of processed game dictionaries
@@ -468,6 +648,10 @@ def apply_game_filters(games, filters):
     
     logger.info(f"🔍 Starting filter process with {len(games)} games")
     logger.info(f"🔍 Filters received: {filters}")
+    
+    # Debug: Log the structure of the first game to understand data format
+    if games:
+        logger.info(f"🔍 Sample game structure: {games[0]}")
     
     filtered_games = games
     original_count = len(filtered_games)
@@ -486,7 +670,7 @@ def apply_game_filters(games, filters):
             logger.debug(f"   ❌ {filter_name}: '{actual_value}' != '{filter_value}'")
         return matches
     
-    # FILTER 1: Player Character
+    # FILTER 1: Player Character - FIXED to use correct nested structure
     character_filter = filters.get('character')
     if character_filter and character_filter != 'all':
         before_count = len(filtered_games)
@@ -581,3 +765,252 @@ def apply_game_filters(games, filters):
     logger.info(f"✅ Final result: {original_count} → {final_count} games after filtering")
     
     return filtered_games
+
+def _get_player_games_for_analysis(player_code):
+    """Get and process player games for analysis."""
+    try:
+        # Get raw games from database
+        games = execute_query('games', 'select_by_player', (player_code,))
+        
+        if not games:
+            logger.info(f"No games found for player: {player_code}")
+            return []
+        
+        # Process games using utils
+        processed_games = process_raw_games_for_player(games, player_code)
+        
+        if not processed_games:
+            logger.info(f"No processed games for player: {player_code}")
+            return []
+        
+        logger.info(f"Retrieved {len(processed_games)} games for analysis")
+        return processed_games
+        
+    except Exception as e:
+        logger.error(f"Error getting player games for analysis: {str(e)}")
+        return []
+
+
+def _calculate_comprehensive_analysis(filtered_games, player_code):
+    """Calculate comprehensive analysis from filtered games."""
+    if not filtered_games:
+        return {
+            'player_code': player_code,
+            'total_games': 0,
+            'wins': 0,
+            'losses': 0,
+            'win_rate': 0,
+            'overall_winrate': 0,
+            'character_stats': {},
+            'opponent_stats': {},
+            'opponent_character_stats': {},
+            'stage_stats': {},
+            'date_stats': {},
+            'recent_games': []
+        }
+    
+    try:
+        # Basic statistics
+        total_games = len(filtered_games)
+        wins = len([g for g in filtered_games if g.get('result') == 'Win'])
+        win_rate_decimal = wins / total_games if total_games > 0 else 0
+        
+        # Initialize stat containers
+        character_stats = {}
+        opponent_stats = {}
+        opponent_character_stats = {}
+        stage_stats = {}
+        date_stats = {}
+        
+        # Process each game for detailed statistics
+        for game in filtered_games:
+            # FIXED: Player character stats - use correct nested structure
+            char = game.get('player', {}).get('character_name', 'Unknown')
+            if char not in character_stats:
+                character_stats[char] = {'games': 0, 'wins': 0}
+            character_stats[char]['games'] += 1
+            if game.get('result') == 'Win':
+                character_stats[char]['wins'] += 1
+            
+            # FIXED: Opponent stats - use correct nested structure
+            opponent = game.get('opponent', {})
+            opp_tag = opponent.get('player_tag', 'Unknown')
+            if opp_tag not in opponent_stats:
+                opponent_stats[opp_tag] = {'games': 0, 'wins': 0}
+            opponent_stats[opp_tag]['games'] += 1
+            if game.get('result') == 'Win':
+                opponent_stats[opp_tag]['wins'] += 1
+            
+            # FIXED: Opponent character stats - use correct nested structure
+            opp_char = opponent.get('character_name', 'Unknown')
+            if opp_char not in opponent_character_stats:
+                opponent_character_stats[opp_char] = {'games': 0, 'wins': 0}
+            opponent_character_stats[opp_char]['games'] += 1
+            if game.get('result') == 'Win':
+                opponent_character_stats[opp_char]['wins'] += 1
+            
+            # Stage stats - this may need fixing too depending on your data
+            stage = game.get('stage_name', game.get('stage_id', 'Unknown'))
+            if stage not in stage_stats:
+                stage_stats[stage] = {'games': 0, 'wins': 0}
+            stage_stats[stage]['games'] += 1
+            if game.get('result') == 'Win':
+                stage_stats[stage]['wins'] += 1
+            
+            # Date stats
+            try:
+                game_date = game.get('start_time', '')[:10]  # Get YYYY-MM-DD
+                if game_date:
+                    if game_date not in date_stats:
+                        date_stats[game_date] = {'games': 0, 'wins': 0}
+                    date_stats[game_date]['games'] += 1
+                    if game.get('result') == 'Win':
+                        date_stats[game_date]['wins'] += 1
+            except:
+                pass  # Skip invalid dates
+        
+        # Calculate win rates for all stat categories
+        for stats_dict in [character_stats, opponent_stats, opponent_character_stats, stage_stats, date_stats]:
+            for key, data in stats_dict.items():
+                data['win_rate'] = data['wins'] / data['games'] if data['games'] > 0 else 0
+        
+        return {
+            'player_code': player_code,
+            'total_games': total_games,
+            'wins': wins,
+            'losses': total_games - wins,
+            'win_rate': win_rate_decimal * 100,  # As percentage for display
+            'overall_winrate': win_rate_decimal,  # As decimal for calculations
+            'character_stats': character_stats,
+            'opponent_stats': opponent_stats,
+            'opponent_character_stats': opponent_character_stats,
+            'stage_stats': stage_stats,
+            'date_stats': date_stats,
+            'recent_games': filtered_games[:20]  # Latest 20 games
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating comprehensive analysis: {str(e)}")
+        raise
+
+def filter_matches(filter_value, actual_value, filter_name="unknown"):
+    """Helper function to check if filter matches actual value."""
+    if filter_value == 'all':
+        return True
+    if isinstance(filter_value, list):
+        matches = actual_value in filter_value
+        if not matches:
+            logger.debug(f"   ❌ {filter_name}: '{actual_value}' not in {filter_value[:3]}...")
+        return matches
+    matches = actual_value == filter_value
+    if not matches:
+        logger.debug(f"   ❌ {filter_name}: '{actual_value}' != '{filter_value}'")
+    return matches
+
+def extract_filter_options(games):
+    """
+    Extract available filter options from games list.
+    
+    FIXED: Use correct data structure for character access.
+    """
+    characters = set()
+    opponents = set()
+    opponent_characters = set()
+    stages = set()
+    
+    for game in games:
+        # FIXED: Player characters - use correct nested structure
+        char = game.get('player', {}).get('character_name')
+        if char and char != 'Unknown':
+            characters.add(char)
+        
+        # Opponent info
+        opponent = game.get('opponent', {})
+        opp_tag = opponent.get('player_tag')
+        if opp_tag and opp_tag != 'Unknown':
+            opponents.add(opp_tag)
+        
+        # FIXED: Opponent characters - use correct nested structure
+        opp_char = opponent.get('character_name')
+        if opp_char and opp_char != 'Unknown':
+            opponent_characters.add(opp_char)
+        
+        # Stages
+        stage = game.get('stage_name', game.get('stage_id'))
+        if stage and stage != 'Unknown':
+            stages.add(str(stage))
+    
+    return {
+        'characters': sorted(list(characters)),
+        'opponents': sorted(list(opponents)),
+        'opponent_characters': sorted(list(opponent_characters)),
+        'stages': sorted(list(stages))
+    }
+
+def calculate_filtered_stats(games, filter_options):
+    """
+    Calculate statistics for filtered games.
+    
+    FIXED: Use correct data structure for character access.
+    """
+    if not games:
+        return {
+            'total_games': 0,
+            'wins': 0,
+            'losses': 0,
+            'overall_winrate': 0,
+            'character_breakdown': {},
+            'opponent_breakdown': {},
+            'opponent_character_breakdown': {}
+        }
+    
+    # Basic stats
+    total_games = len(games)
+    wins = len([g for g in games if g.get('result') == 'Win'])
+    win_rate = wins / total_games if total_games > 0 else 0
+    
+    # Character breakdown
+    character_breakdown = {}
+    opponent_breakdown = {}
+    opponent_character_breakdown = {}
+    
+    for game in games:
+        # FIXED: Character stats - use correct nested structure
+        char = game.get('player', {}).get('character_name', 'Unknown')
+        if char not in character_breakdown:
+            character_breakdown[char] = {'games': 0, 'wins': 0}
+        character_breakdown[char]['games'] += 1
+        if game.get('result') == 'Win':
+            character_breakdown[char]['wins'] += 1
+        
+        # FIXED: Opponent stats - use correct nested structure
+        opponent = game.get('opponent', {})
+        opp_tag = opponent.get('player_tag', 'Unknown')
+        if opp_tag not in opponent_breakdown:
+            opponent_breakdown[opp_tag] = {'games': 0, 'wins': 0}
+        opponent_breakdown[opp_tag]['games'] += 1
+        if game.get('result') == 'Win':
+            opponent_breakdown[opp_tag]['wins'] += 1
+        
+        # FIXED: Opponent character stats - use correct nested structure
+        opp_char = opponent.get('character_name', 'Unknown')
+        if opp_char not in opponent_character_breakdown:
+            opponent_character_breakdown[opp_char] = {'games': 0, 'wins': 0}
+        opponent_character_breakdown[opp_char]['games'] += 1
+        if game.get('result') == 'Win':
+            opponent_character_breakdown[opp_char]['wins'] += 1
+    
+    # Calculate win rates
+    for breakdown in [character_breakdown, opponent_breakdown, opponent_character_breakdown]:
+        for key, data in breakdown.items():
+            data['win_rate'] = data['wins'] / data['games'] if data['games'] > 0 else 0
+    
+    return {
+        'total_games': total_games,
+        'wins': wins,
+        'losses': total_games - wins,
+        'overall_winrate': win_rate,
+        'character_breakdown': character_breakdown,
+        'opponent_breakdown': opponent_breakdown,
+        'opponent_character_breakdown': opponent_character_breakdown
+    }

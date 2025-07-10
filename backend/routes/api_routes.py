@@ -91,25 +91,52 @@ def player_stats(encoded_player_code):
         logger.error(f"Error fetching player stats: {str(e)}")
         return jsonify({'error': 'Failed to fetch player statistics'}), 500
 
-@api_bp.route('/player/<encoded_player_code>/detailed', methods=['GET'])
+@api_bp.route('/player/<encoded_player_code>/detailed', methods=['GET', 'POST'])
 @rate_limited(config.RATE_LIMIT_API)
 def player_detailed_stats(encoded_player_code):
-    """Get detailed player statistics and analysis."""
+    """
+    Get detailed player statistics and analysis.
+    
+    Supports both GET (query params) and POST (JSON body) for filters.
+    The frontend JavaScript uses POST with JSON for complex filter combinations.
+    """
     try:
         player_code = decode_player_tag(encoded_player_code)
         
-        # Get filter parameters
-        character = request.args.get('character', 'all')
-        opponent = request.args.get('opponent', 'all')
-        stage = request.args.get('stage', 'all')
-        limit = int(request.args.get('limit', 100))
+        # Handle different request methods
+        if request.method == 'POST':
+            # POST: Get filters from JSON body (frontend expects this)
+            if not request.is_json:
+                return jsonify({'error': 'Content-Type must be application/json'}), 400
+            
+            filter_data = request.get_json() or {}
+            character = filter_data.get('character', 'all')
+            opponent = filter_data.get('opponent', 'all')
+            opponent_character = filter_data.get('opponent_character', 'all')
+            stage = filter_data.get('stage', 'all')
+            limit = int(filter_data.get('limit', 100))
+            
+            logger.info(f"POST request with filters: {filter_data}")
+            
+        else:
+            # GET: Get filters from query parameters (for direct URL access)
+            character = request.args.get('character', 'all')
+            opponent = request.args.get('opponent', 'all')
+            opponent_character = request.args.get('opponent_character', 'all')
+            stage = request.args.get('stage', 'all')
+            limit = int(request.args.get('limit', 100))
+            
+            logger.info(f"GET request with query params")
         
+        # Call the API service with all filter parameters
         detailed_stats = services.process_detailed_player_data(
-            player_code, character, opponent, stage, limit
+            player_code, character, opponent, stage, limit, opponent_character
         )
+        
         return jsonify(detailed_stats)
+        
     except ValueError:
-        abort(400, description="Invalid player code format")
+        return jsonify({'error': 'Invalid player code format'}), 400
     except Exception as e:
         logger.error(f"Error fetching detailed player stats: {str(e)}")
         return jsonify({'error': 'Failed to fetch detailed player statistics'}), 500
