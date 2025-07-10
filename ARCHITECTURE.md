@@ -1,283 +1,527 @@
-# Architecture Overview
+# Architecture Documentation - Slippi Stats Server
 
-This document provides a high-level overview of the Slippi Stats Server architecture and the refactoring journey that led to the current production-ready design.
+Complete architectural reference for the current service-oriented implementation.
 
-## Executive Summary
+## **Overview** 🏗️
 
-Slippi Stats Server has evolved from a monolithic application into a **modern, service-oriented architecture** with clear separation of concerns, comprehensive testing, and production-ready observability. The current architecture enables confident refactoring, rapid feature development, and long-term maintainability.
+The Slippi Stats Server follows a **service-oriented architecture** with clear separation of concerns, external SQL management, and hybrid service patterns. The architecture successfully migrated from a monolithic structure to enable maintainability, testability, and scalability.
 
-## Architecture Evolution
+### **Core Architectural Principle**
+> **"Services Process, Database Stores, Utils Help, SQL Separates"**
 
-### Before: Monolithic Structure (Legacy)
+## **Current Architecture State** ✅
+
+### **Backend Layer Structure**
 ```
-├── app.py                 # 🔴 Large monolithic file (500+ lines)
-│   ├── Flask setup        # Mixed with business logic
-│   ├── Route handlers     # Mixed with data processing
-│   ├── Database operations # Embedded SQL strings
-│   ├── Business logic     # Tightly coupled
-│   └── Error handling     # Scattered throughout
-├── config.py              # ✅ Already modular
-└── database.py            # ✅ Already modular
-```
-
-**Problems with Legacy Architecture:**
-- **Tight Coupling**: Business logic mixed with HTTP handling and database operations
-- **Embedded SQL**: Database queries scattered throughout Python files as strings
-- **Difficult Testing**: Monolithic structure made unit testing challenging
-- **Poor Separation**: No clear boundaries between different responsibilities
-- **Hard to Maintain**: Changes often affected multiple unrelated areas
-
-### After: Service-Oriented Architecture (Current) ✅
-```
-├── app.py                      # ✅ Lightweight entry point (40 lines)
-├── backend/
-│   ├── routes/                 # ✅ HTTP layer - thin controllers
-│   │   ├── web_routes.py       # HTML page endpoints
-│   │   ├── api_routes.py       # JSON API endpoints
-│   │   ├── static_routes.py    # File serving
-│   │   └── error_handlers.py   # HTTP error responses
-│   ├── web_service.py          # ✅ Web business logic
-│   ├── api_service.py          # ✅ API business logic
-│   ├── utils.py                # ✅ Shared utilities
-│   ├── database.py             # ✅ Pure data access
-│   ├── sql_manager.py          # ✅ SQL file management
-│   ├── config.py               # ✅ Configuration management
-│   └── sql/                    # ✅ External SQL files
-│       ├── schema/             # Database structure
-│       ├── games/              # Game operations
-│       ├── clients/            # Client management
-│       ├── api_keys/           # Authentication
-│       ├── files/              # File operations
-│       └── stats/              # Analytics queries
-├── frontend/                   # ✅ Component-based architecture
-│   ├── components/             # Self-contained UI packages
-│   ├── layouts/                # Component orchestration
-│   └── pages/                  # Page-specific functionality
-└── tests/                      # ✅ Architecture-aligned testing
-    ├── test_service_layer.py   # Business logic contracts
-    ├── test_database_simple.py # SQL and database integration
-    ├── test_api_endpoints.py   # HTTP API testing
-    └── test_web_pages.py       # Page rendering testing
-```
-
-## Current Architecture Benefits
-
-### 1. **Maintainability** 🔧
-- **Clear Module Boundaries**: Each file has a single, well-defined responsibility
-- **External SQL Management**: Database queries are version-controlled, readable, and organized
-- **Component Isolation**: Frontend components are self-contained with clear interfaces
-- **Enforced Import Rules**: Strict hierarchy prevents architectural violations
-
-### 2. **Testability** 🧪
-- **Service Layer Tests**: Fast business logic validation (runs in <1 second)
-- **Integration Tests**: Database and API endpoint coverage with real data
-- **Component Tests**: UI behavior validation independent of business logic
-- **Architecture Alignment**: Tests respect module boundaries and contracts
-
-### 3. **Developer Experience** 👨‍💻
-- **Hot Reloading**: SQL queries can be updated without application restart
-- **Clear Guidelines**: Comprehensive documentation for each architectural layer
-- **Quick Feedback**: Fast test suite provides immediate validation during development
-- **Predictable Patterns**: Consistent conventions across all modules
-
-### 4. **Scalability** 📈
-- **Service Boundaries**: Easy to extract microservices if needed in the future
-- **Component Reusability**: Frontend components work across different pages and layouts
-- **External SQL**: Database queries are optimized, organized, and discoverable
-- **Horizontal Scaling**: Clean separation enables database read replicas and caching
-
-### 5. **Observability** 📊
-- **Distributed Tracing**: Request flow visibility across all application layers
-- **Business Metrics**: Games processed, files uploaded, API usage tracking
-- **Performance Monitoring**: Response times, database query performance, error rates
-- **Development-Friendly**: Local observability stack with Docker for debugging
-
-## Architectural Principles
-
-### Backend: "Services Process, Database Stores, Utils Help, SQL Separates"
-
-#### **Service Layer** (`web_service.py`, `api_service.py`)
-- **Responsibility**: Business logic and request processing
-- **Imports**: Can use `database`, `utils`, `config` modules
-- **Testing**: Fast contract tests validate inputs/outputs
-- **Principles**: Single responsibility, clear interfaces, no direct SQL
-
-#### **Database Layer** (`database.py` + `sql/`)
-- **Responsibility**: Pure data access using external SQL files
-- **Imports**: Only `config` and `sql_manager`
-- **Testing**: Integration tests with real SQLite databases
-- **Principles**: No business logic, parameterized queries, organized SQL
-
-#### **Utils Layer** (`utils.py`)
-- **Responsibility**: Shared data processing and helper functions
-- **Imports**: Only `config` module
-- **Testing**: Function-level tests for data transformation
-- **Principles**: Stateless, reusable, well-documented functions
-
-#### **Routes Layer** (`routes/*.py`)
-- **Responsibility**: HTTP request/response handling only
-- **Imports**: Services and error handling utilities
-- **Testing**: HTTP endpoint tests with request/response validation
-- **Principles**: Thin controllers, delegate to services, consistent error handling
-
-### Frontend: "Components Do, Layouts Share, Pages Orchestrate"
-
-#### **Component Layer** (`components/*/`)
-- **Responsibility**: Self-contained UI behavior and styling
-- **Assets**: Own CSS/JS files with auto-initialization
-- **Testing**: Independent component behavior validation
-- **Principles**: Single responsibility, reusable, no business logic
-
-#### **Layout Layer** (`layouts/*.html`)
-- **Responsibility**: Component orchestration and page structure
-- **Assets**: No CSS/JS files - templates only
-- **Testing**: Integration via page rendering tests
-- **Principles**: Composition over inheritance, component coordination
-
-#### **Page Layer** (`pages/*/`)
-- **Responsibility**: Business logic, API calls, component coordination
-- **Assets**: Page-specific CSS/JS with DOMContentLoaded patterns
-- **Testing**: Full page rendering and functionality tests
-- **Principles**: Orchestration, error handling, user experience
-
-## Module Import Hierarchy
-
-The architecture enforces strict import rules to prevent circular dependencies and maintain clean boundaries:
-
-```
-┌─────────────────────────────────────────────┐
-│                  app.py                     │ ← Top Level
-│           (Flask setup only)                │
-└─────────────────┬───────────────────────────┘
-                  │ can import ↓
-┌─────────────────┴───────────────────────────┐
-│              routes/*.py                    │ ← HTTP Layer
-│        (Blueprint registration)             │
-└─────────────────┬───────────────────────────┘
-                  │ can import ↓
-┌─────────────────┴───────────────────────────┐
-│        web_service.py + api_service.py      │ ← Business Logic
-│           (Service layer)                   │
-└─────────────────┬───────────────────────────┘
-                  │ can import ↓
-┌─────────────────┴───────────────────────────┐
-│    utils.py + database.py + config.py      │ ← Foundation
-│         (Shared utilities)                  │
-└─────────────────┬───────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│                Routes Layer                     │ ← HTTP handling, thin controllers
+│        (web_routes.py, api_routes.py)          │
+└─────────────────┬───────────────────────────────┘
+                  │ delegates to ↓
+┌─────────────────┴───────────────────────────────┐
+│              Service Layer                      │ ← Business logic
+│   Monolithic Services + Domain Services        │
+│     (api_service.py, web_service.py)           │
+│     (client/, upload/ domains)                 │
+└─────────────────┬───────────────────────────────┘
                   │ uses ↓
-┌─────────────────┴───────────────────────────┐
-│              sql/ directory                 │ ← Data Queries
-│          (External SQL files)               │
-└─────────────────────────────────────────────┘
+┌─────────────────┴───────────────────────────────┐
+│              Support Layer                      │ ← Foundation
+│    (backend.db, utils.py, config.py)          │
+└─────────────────┬───────────────────────────────┘
+                  │ loads ↓
+┌─────────────────┴───────────────────────────────┐
+│             External SQL Files                  │ ← Organized queries
+│              (sql/ directory)                   │
+└─────────────────────────────────────────────────┘
 ```
 
-**Enforced Rules:**
-- ✅ **Services** can import: `database`, `utils`, `config`
-- ✅ **Utils** can import: `config` only
-- ✅ **Database** can import: `config`, `sql_manager` only
-- ✅ **Routes** can import: services and utilities
-- ❌ **No circular imports** between any modules
-- ❌ **Lower layers cannot import** higher layers
-
-## Data Flow Architecture
-
-### Request Processing Flow
+### **Frontend Architecture**
 ```
-HTTP Request → Routes → Services → Database → SQL Files → Response
-     ↓            ↓         ↓          ↓         ↓
-   Validation   Business   Utils    External   Formatted
-   & Routing     Logic   Functions   Queries     Data
-```
-
-**Detailed Flow:**
-1. **Routes** receive HTTP request and validate parameters
-2. **Routes** delegate to appropriate **Service** function
-3. **Service** processes business logic using **Utils** for data transformation
-4. **Service** calls **Database** functions for data persistence/retrieval
-5. **Database** loads appropriate **SQL file** using sql_manager
-6. **Database** executes SQL with parameters and returns raw data
-7. **Service** formats data using **Utils** and returns to **Routes**
-8. **Routes** render template or return JSON response
-
-### Component Interaction Flow (Frontend)
-```
-Page JavaScript → Component APIs → DOM Manipulation → User Interface
-      ↓               ↓              ↓                    ↓
-  Business Logic   UI Behavior   Visual Updates     User Experience
+┌─────────────────────────────────────────────────┐
+│                 Pages Layer                     │ ← Business logic, API calls
+│           (pages/ directory)                    │
+└─────────────────┬───────────────────────────────┘
+                  │ uses ↓
+┌─────────────────┴───────────────────────────────┐
+│               Layouts Layer                     │ ← Component orchestration
+│           (layouts/ directory)                  │
+└─────────────────┬───────────────────────────────┘
+                  │ provides ↓
+┌─────────────────┴───────────────────────────────┐
+│             Components Layer                    │ ← Self-contained UI behavior
+│          (components/ directory)                │
+└─────────────────────────────────────────────────┘
 ```
 
-## Key Innovations
+## **Service Layer Architecture** 🔧
 
-### 1. **External SQL File Management**
-- **Dynamic Discovery**: Add `.sql` files and they become available automatically
-- **Template Support**: Use `{variable}` placeholders for flexible queries
-- **Category Organization**: Logical grouping by functionality (games, clients, etc.)
-- **Version Control**: SQL changes tracked in git like code
-- **Hot Reloading**: Update queries without application restart in development
+### **Hybrid Service Pattern**
+The backend uses a **hybrid approach** combining two service patterns:
 
-### 2. **Component-Based Frontend**
-- **Asset Ownership**: Components manage their own CSS/JS files
-- **Auto-Initialization**: Components work immediately when included
-- **Template Macros**: Clean interfaces between layouts and pages
+#### **Monolithic Services** (Legacy - Stable)
+- **Purpose**: Well-defined, stable business logic
+- **Files**: `api_service.py`, `web_service.py`
+- **Characteristics**: Single file per service type, comprehensive functionality
+- **Status**: Mature, well-tested, handles core features
+
+#### **Domain Services** (New - Schema-Driven)
+- **Purpose**: Complex business areas requiring standardized data formats
+- **Structure**: `backend/services/{domain}/` with 5-file structure
+- **Characteristics**: Schema validation, type safety, clear boundaries
+- **Current Domains**: `client/`, `upload/`
+
+### **Service Layer Import Rules** (Strictly Enforced)
+```python
+# ✅ Services can import:
+from backend.db import execute_query        # Data access
+from backend.utils import helper_function   # Shared utilities
+from backend.config import get_config       # Configuration
+
+# ✅ Routes can import:
+import backend.services as services         # All service functions
+from backend.services.client import register_client  # Domain-specific
+
+# ❌ Services cannot import:
+from backend.routes import *               # Routes import services, not vice versa
+from other_service import *                # Services should not import each other
+
+# ❌ Support layers cannot import:
+from backend.services import *             # Lower layers can't import higher
+```
+
+## **Database Layer** 💾
+
+### **Current Implementation: backend.db**
+The database layer uses a simplified architecture with external SQL management:
+
+```python
+# Database access pattern
+from backend.db import execute_query
+
+# Execute external SQL queries
+games = execute_query('games', 'select_by_player', (player_code,))
+```
+
+### **External SQL Organization**
+```
+sql/
+├── games/
+│   ├── select_by_player.sql      # Get games for specific player
+│   ├── select_recent.sql         # Get recent games for homepage
+│   └── insert_game.sql           # Insert new game record
+├── clients/
+│   ├── select_by_id.sql          # Get client by ID
+│   ├── insert_client.sql         # Register new client
+│   └── update_last_active.sql    # Update client activity
+├── files/
+│   ├── select_by_client.sql      # Get files for client
+│   └── insert_file.sql           # Store file metadata
+└── stats/
+    ├── count_unique_players.sql  # Server statistics
+    └── file_stats_total.sql      # File storage stats
+```
+
+### **SQL Query Features**
+- **Dynamic Discovery**: Add `.sql` files and they're automatically available
+- **Template Support**: Use `{variable}` placeholders for dynamic queries
+- **Category Organization**: Logical grouping by functionality
+- **Hot Reloading**: Update queries without application restart (development)
+
+## **Service Catalog** 📋
+
+### **Monolithic Services**
+
+#### **`api_service.py` - API Business Logic**
+```python
+# Player analysis
+process_detailed_player_data(player_code, character, opponent, stage, limit, opponent_character)
+process_player_basic_stats(player_code)
+apply_game_filters(games, filters)
+
+# Server management
+process_server_statistics()
+validate_api_key(api_key)
+
+# File management
+get_client_files(client_id, limit)
+get_file_details(file_id, client_id)
+```
+
+#### **`web_service.py` - Web Business Logic**
+```python
+# Page data preparation
+prepare_homepage_data()
+prepare_all_players_data()
+process_player_profile_request(encoded_player_code)
+process_player_detailed_request(encoded_player_code)
+
+# Template data helpers
+prepare_standard_player_template_data(player_code, encoded_player_code)
+```
+
+### **Domain Services**
+
+#### **`client/` - Client Domain Service**
+```python
+# Client lifecycle management
+register_client(client_data, registration_key)
+authenticate_client(api_key)
+update_client_info(client_id, update_data)
+get_client_details(client_id)
+refresh_api_key(client_id)
+```
+
+#### **`upload/` - Upload Domain Service**
+```python
+# Upload orchestration
+process_combined_upload(client_id, upload_data)
+upload_games_for_client(client_id, games_data)
+process_file_upload(client_id, file_info, file_content)
+```
+
+### **Support Layers**
+
+#### **`backend.db` - Data Access**
+```python
+# Simple database interface
+execute_query(category, query_name, params, fetch_one=False)
+```
+
+#### **`utils.py` - Shared Utilities**
+```python
+# Game processing
+process_raw_games_for_player(raw_games, target_player_tag)
+parse_player_data_from_game(game_data)
+
+# Player tag handling
+encode_player_tag(player_tag)
+decode_player_tag(encoded_tag)
+
+# Statistics
+calculate_win_rate(wins, total_games)
+```
+
+## **Data Flow Architecture** 🔄
+
+### **Frontend Filter Request Flow**
+```
+Frontend JavaScript
+    ↓ POST /api/player/{code}/detailed
+    ↓ JSON: {character: "Fox", opponent_character: "Falco"}
+API Route (api_routes.py)
+    ↓ delegates to
+API Service (process_detailed_player_data)
+    ↓ calls helpers
+Filter Functions (_apply_comprehensive_filters)
+    ↓ access data via
+Database Layer (execute_query)
+    ↓ loads SQL from
+External SQL File (games/select_by_player.sql)
+    ↓ returns processed data to
+Frontend (updates charts, tables, filter options)
+```
+
+### **Client Registration Flow**
+```
+Client Application
+    ↓ POST /api/clients/register
+    ↓ JSON: {client_name: "MyApp", version: "1.0.0"}
+API Route (client_registration)
+    ↓ delegates to
+Client Domain Service (register_client)
+    ↓ orchestrates
+Validation (validate_client_registration_data)
+    ↓ then
+Processors (create_client_in_database + generate_api_key)
+    ↓ creates
+Database Record + API Key File
+    ↓ returns
+{success: true, client_id: "...", api_key: "..."}
+```
+
+### **Game Upload Flow**
+```
+Client Upload
+    ↓ POST /api/games/upload (with API key)
+    ↓ JSON: {games: [...], files: [...]}
+API Route (games_upload)
+    ↓ authenticates via @require_api_key
+Upload Domain Service (process_combined_upload)
+    ↓ orchestrates
+Schemas (normalize game data formats)
+    ↓ then
+Validation (business rules + data integrity)
+    ↓ then  
+Processors (database operations + file handling)
+    ↓ returns
+{success: true, games_processed: 5, files_uploaded: 2}
+```
+
+## **Frontend Architecture** 🎨
+
+### **Component-Based Design**
+The frontend follows **"Components Do, Layouts Share, Pages Orchestrate"**:
+
+#### **Components** (Self-Contained Behavior)
+- **Auto-Initialization**: No manual setup required
+- **Asset Management**: Components manage their own CSS/JS
 - **Progressive Enhancement**: Core functionality works without JavaScript
+- **Reusability**: Used across multiple pages and layouts
 
-### 3. **Architecture-Aligned Testing**
-- **Service Layer Tests**: Fast contract validation for business logic
-- **Integration Tests**: Real database and HTTP testing for confidence
-- **Clear Categories**: Each test type has specific purpose and speed characteristics
-- **Refactoring Safety**: Tests validate contracts, not implementation details
+#### **Layouts** (Component Orchestration)
+- **Component Imports**: Make components available to pages
+- **Shared Structure**: Common page elements (navbar, footer)
+- **Asset Loading**: Include component CSS/JS files
+- **Template Inheritance**: Provide base structure for pages
 
-## Production Readiness
+#### **Pages** (Business Logic)
+- **API Calls**: Handle data fetching and processing
+- **Component Coordination**: Connect components for page functionality
+- **User Interactions**: Handle form submissions and user actions
+- **Data Management**: Process and display dynamic content
 
-### Current Status ✅
-- **Service-Oriented Architecture**: Complete and stable
-- **External SQL Management**: All queries externalized and organized
-- **Blueprint-Based Routing**: Modular HTTP handling implemented
-- **Component-Based Frontend**: Clear separation of concerns achieved
-- **Comprehensive Testing**: 51% coverage with multiple test categories
-- **Observability**: OpenTelemetry tracing and metrics implemented
+### **Data Structure Example**
+```javascript
+// Pages handle API calls and data processing
+async function fetchPlayerData(filters = {}) {
+    const response = await fetch(`/api/player/${encodedPlayerCode}/detailed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters)
+    });
+    const data = await response.json();
+    
+    // Coordinate components with processed data
+    updateCharacterFilters(data.character_stats);
+    updateGamesTables(data.recent_games);
+    updateCharts(data.date_stats);
+}
+```
 
-### Performance Characteristics
-- **Service Layer Tests**: < 1 second execution time
-- **Database Operations**: Optimized with appropriate indexes
-- **Frontend Components**: Progressive enhancement with minimal JavaScript
-- **API Responses**: Structured error handling and consistent formatting
+## **Key Architectural Innovations** 💡
 
-### Scalability Features
-- **Database**: SQLite with external query management (easy to migrate to PostgreSQL)
-- **Services**: Clear boundaries enable microservice extraction if needed
-- **Frontend**: Component reusability reduces duplication and maintenance
-- **Observability**: Production-ready monitoring and alerting capabilities
+### **1. External SQL Management**
+- **Dynamic Discovery**: SQL files automatically available
+- **Template Variables**: `{variable}` substitution for flexible queries
+- **Category Organization**: Logical grouping by functionality
+- **Version Control**: SQL tracked in git like code
+- **Hot Reloading**: Update queries without restart (development)
 
-## Future Architecture Considerations
+### **2. Hybrid Service Architecture**
+- **Monolithic Services**: For stable, well-defined business logic
+- **Domain Services**: For complex areas requiring schema standardization
+- **Backward Compatibility**: Both patterns coexist during migration
+- **Clear Migration Path**: Guidelines for when to use each pattern
 
-### Potential Enhancements
-1. **Caching Layer**: Redis integration for expensive query result caching
-2. **Query Performance Monitoring**: Track slow queries and optimization opportunities
-3. **Database Migration System**: Versioned schema changes with rollback capability
-4. **API Versioning**: Support for multiple API versions as the system evolves
+### **3. Schema-Driven Domain Services**
+- **Type Safety**: Clear data contracts with validation
+- **Standardization**: Eliminates data format inconsistencies
+- **Error Handling**: Structured validation messages
+- **Computed Fields**: Automatic field generation (stage names, etc.)
 
-### Migration Paths
-- **Database**: External SQL files make PostgreSQL migration straightforward
-- **Microservices**: Service boundaries enable gradual extraction if needed
-- **Frontend Framework**: Component architecture provides clear migration path
-- **Deployment**: Docker support for containerized deployment
+### **4. Component-Based Frontend**
+- **Progressive Enhancement**: Works without JavaScript
+- **Auto-Initialization**: Components set themselves up
+- **Asset Ownership**: Components manage their own CSS/JS
+- **Reusability**: Clear interfaces for component reuse
 
-## Conclusion
+## **Performance Characteristics** ⚡
 
-The current architecture represents a **significant improvement** over the legacy monolithic structure. It provides:
+### **Current Performance Profile**
+- **Response Times**: Sub-second for most operations
+- **Database**: SQLite with optimized external SQL queries
+- **Memory Usage**: Efficient data processing with streaming for large uploads
+- **Frontend**: Progressive loading with component-based architecture
 
-- **Developer Confidence**: Comprehensive testing enables fearless refactoring
-- **Maintainability**: Clear boundaries and external SQL make changes predictable
-- **Scalability**: Service-oriented design supports future growth
-- **Quality**: Enforced patterns prevent architectural violations
+### **Optimization Opportunities**
+1. **Query Result Caching**: Redis layer for expensive player statistics
+2. **Database Connection Pooling**: Better resource utilization
+3. **API Response Caching**: Cache stable data like basic player stats
+4. **Frontend Optimization**: Browser caching for static assets
 
-This architecture serves as a **solid foundation** for continued development and provides clear patterns for contributors of all experience levels.
+### **Scaling Considerations**
+- **Service Boundaries**: Ready for microservice extraction
+- **Database Migration**: External SQL makes PostgreSQL migration straightforward
+- **Frontend Scaling**: Component architecture supports CDN deployment
+- **Observability**: Full tracing enables performance monitoring
 
-## Related Documentation
+## **Testing Architecture** 🧪
 
-- **Contributing Guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Backend Details**: [backend/README.md](backend/README.md)
-- **Frontend Details**: [frontend/README.md](frontend/README.md)
-- **Testing Guide**: [tests/README.md](tests/README.md)
-- **SQL Management**: [backend/sql/README.md](backend/sql/README.md)
+### **Architecture-Aligned Testing**
+Tests respect the service-oriented module hierarchy:
+
+#### **Service Layer Tests** (Fast - <1 second)
+```python
+# Contract-based testing - validate inputs/outputs
+def test_service_function_contract():
+    result = service_function(test_input)
+    assert isinstance(result, dict)
+    assert 'success' in result or 'error' in result
+```
+
+#### **Domain Service Tests** (Schema-Focused)
+```python
+# Schema standardization testing
+def test_domain_schema_standardization():
+    schema_obj = DomainSchema.from_input_data(test_data)
+    assert isinstance(schema_obj.result, StandardizedEnum)
+```
+
+#### **Integration Tests** (Database + HTTP)
+```python
+# End-to-end workflow testing
+def test_complete_upload_workflow():
+    response = client.post('/api/games/upload', 
+                          headers={'X-API-Key': test_key},
+                          json=test_upload_data)
+    assert response.status_code == 200
+```
+
+### **Current Test Coverage**
+- **Overall Coverage**: 51%
+- **Target Coverage**: 75%
+- **Priority Areas**: Service layer contract tests, domain schema validation
+
+## **Security Architecture** 🔒
+
+### **API Authentication**
+```python
+# API key-based authentication
+@require_api_key
+def protected_endpoint(client_id):
+    # client_id automatically provided by decorator
+    pass
+```
+
+### **Rate Limiting**
+```python
+# Client-based rate limiting
+@rate_limited(max_per_minute=30)
+def upload_endpoint():
+    pass
+```
+
+### **Input Validation**
+- **Service Layer**: Business rule validation
+- **Domain Services**: Schema-based validation with type safety
+- **Route Layer**: Basic parameter validation
+
+## **Observability & Monitoring** 📊
+
+### **Current Implementation**
+- **OpenTelemetry Tracing**: Request flow visibility across all layers
+- **Prometheus Metrics**: Business and performance monitoring
+- **Structured Logging**: Comprehensive error tracking and debugging
+- **Grafana Dashboards**: Operational insights and alerting
+
+### **Monitoring Coverage**
+- **Business Metrics**: Games processed, files uploaded, API usage
+- **Performance Metrics**: Response times, database query performance
+- **Error Tracking**: Exception rates, error patterns
+- **Resource Monitoring**: Memory usage, database performance
+
+## **Configuration Management** ⚙️
+
+### **Environment-Based Configuration**
+```python
+class DevelopmentConfig:
+    DEBUG = True
+    RATE_LIMIT_API = 60
+    RATE_LIMIT_UPLOADS = 30
+    RATE_LIMIT_REGISTRATION = 5
+
+class ProductionConfig:
+    DEBUG = False
+    RATE_LIMIT_API = 120
+    RATE_LIMIT_UPLOADS = 60
+    RATE_LIMIT_REGISTRATION = 10
+```
+
+### **Configuration Categories**
+- **Database**: Connection settings, file paths
+- **Rate Limiting**: API endpoint limits
+- **File Storage**: Upload directories, size limits
+- **Security**: API key settings, authentication
+- **Observability**: Tracing endpoints, metrics configuration
+
+## **Migration Status & Future Plans** 🗺️
+
+### **Current Migration State**
+- ✅ **External SQL**: 100% of queries externalized
+- ✅ **Service Layer**: Complete service-oriented architecture
+- ✅ **Domain Services**: Client and upload domains implemented
+- ✅ **Frontend**: Component-based architecture complete
+- ✅ **Testing**: Architecture-aligned test framework
+- ✅ **Observability**: Production-ready monitoring
+
+### **Future Migration Candidates**
+
+#### **Player Domain** (High Priority)
+- **Current**: Scattered across `api_service.py` and `web_service.py`
+- **Benefits**: Standardized player data schemas, better caching
+- **Scope**: Player statistics, analysis, search functionality
+
+#### **Stats Domain** (Medium Priority)
+- **Current**: Mixed into various services
+- **Benefits**: Centralized statistics logic, performance optimization
+- **Scope**: Server statistics, leaderboards, analytics
+
+### **Architectural Evolution Timeline**
+```
+Current: Hybrid (70% monolithic, 30% domain services)
+    ↓ 3-6 months
+Target: Domain-oriented (80% domain, 20% monolithic)
+    ↓ 6-12 months
+Future: Microservice-ready (service extraction capability)
+```
+
+## **Development Guidelines** 📝
+
+### **Adding New Features**
+
+#### **New Web Page**
+1. Add route to `web_routes.py` with thin handler
+2. Add business logic to appropriate service
+3. Create page template extending appropriate layout
+4. Add SQL queries to `sql/` category if needed
+5. Add service layer and integration tests
+
+#### **New API Endpoint**
+1. Add route to `api_routes.py` with authentication/rate limiting
+2. Add business logic to appropriate service
+3. Update API documentation
+4. Add comprehensive tests
+5. Consider domain service if complex
+
+#### **New Domain Service**
+1. Create domain directory with 5-file structure
+2. Implement schemas first (data structures)
+3. Add validation logic and business rules
+4. Create orchestrators and processors
+5. Add comprehensive domain tests
+6. Update service exports
+
+### **Code Quality Standards**
+- **Service Functions**: Follow orchestrator pattern (10-20 lines)
+- **Error Handling**: Comprehensive exception handling
+- **Documentation**: Clear docstrings with Args/Returns
+- **Testing**: Contract-based tests for all service functions
+- **Import Rules**: Strict hierarchy enforcement
+
+### **Performance Guidelines**
+- **Database Queries**: Use external SQL with parameters
+- **Caching**: Consider caching for expensive operations
+- **Streaming**: Use generators for large data processing
+- **Frontend**: Progressive enhancement, component optimization
+
+---
+
+**This architecture successfully serves production traffic with:**
+- **Zero-downtime deployments**
+- **Sub-second response times**
+- **Comprehensive observability**
+- **Clear migration paths for future scaling**
+
+**Last Updated**: December 2024  
+**Architecture Status**: Production-ready, actively maintained

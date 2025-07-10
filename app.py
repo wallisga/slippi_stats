@@ -72,3 +72,5 @@ if __name__ == '__main__':
         port=config.PORT,
         debug=config.DEBUG
     )
+
+app = create_app()

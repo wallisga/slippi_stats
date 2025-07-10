@@ -1,647 +1,608 @@
-# Service Layer Architecture
+# Service Directory - Backend Services Reference
 
-This directory contains the business logic services for the Slippi Stats Server. Services implement the core application functionality using the **Orchestrator Pattern** for maintainable, testable code.
+Quick reference guide to all backend services, their responsibilities, and current status.
 
-## Overview
+## **Service Layer Overview** 🏗️
 
-The service layer sits between the HTTP routes and the data access layer, implementing business logic and coordinating between different components of the application.
+### **Current Architecture Pattern**
+The backend uses a **hybrid service architecture** combining:
+- **Monolithic Services**: Legacy pattern for stable, well-defined business logic
+- **Domain Services**: New pattern for complex areas requiring schema standardization
 
-### Service Layer Responsibilities
+### **Import Pattern**
+```python
+# Standard import pattern for services
+from backend.services import function_name
 
-**✅ Services DO:**
-- Implement business logic and workflows
-- Coordinate between database, utils, and external services
-- Handle complex data processing and validation
-- Manage transactions and error handling
-- Transform data between different formats
-
-**❌ Services DON'T:**
-- Handle HTTP requests/responses directly (routes do this)
-- Contain SQL queries (database layer does this)
-- Implement utility functions (utils layer does this)
-- Manage configuration (config module does this)
+# Domain-specific imports (when needed)
+from backend.services.domain_name import specific_function
+```
 
 ---
 
-## Service Organization Approaches
+## **Monolithic Services** (Legacy Pattern - Stable)
 
-We support two service organization patterns depending on complexity and team needs:
+### **`api_service.py` - API Business Logic** ✅
+**Purpose**: JSON API responses and API-specific processing
 
-### **Approach 1: Monolithic Services** (Current - Simple)
-```
-backend/services/
-├── api_service.py      # API business logic
-└── web_service.py      # Web business logic
-```
+#### **Player Analysis Functions**
+- `process_detailed_player_data(player_code, character, opponent, stage, limit, opponent_character)`
+  - **Purpose**: Advanced player analysis with comprehensive filtering
+  - **Returns**: Detailed stats with character/opponent/stage breakdowns
+  - **Usage**: API endpoint for detailed player pages
 
-**Use when:**
-- ✅ Small team (1-3 developers)
-- ✅ Services under 500 lines
-- ✅ Simple domain boundaries
-- ✅ Rapid prototyping
+- `process_player_basic_stats(player_code)`
+  - **Purpose**: Basic player statistics for API responses
+  - **Returns**: Win/loss record, win rate, total games
+  - **Usage**: Simple player stat API endpoints
 
-### **Approach 2: Domain Services** (Recommended - Scalable)
-```
-backend/services/
-├── README.md                    # This file
-├── __init__.py                  # Backward compatibility exports
-├── upload/                      # 🆕 Upload domain
-│   ├── __init__.py             # Domain exports  
-│   ├── schemas.py              # Data structures
-│   ├── validation.py           # Business rules
-│   ├── service.py              # Orchestrators
-│   ├── processors.py           # Business logic
-│   └── README.md              # Domain docs
-├── player/                      # 🔄 Future: Player domain
-└── client/                      # 🔄 Future: Client domain
-```
+#### **Filtering & Analysis Functions**
+- `apply_game_filters(games, filters)`
+  - **Purpose**: Apply character/opponent/stage filters to game lists
+  - **Usage**: Filter games by multiple criteria with AND logic
+  - **Recently Fixed**: Character data structure access
 
-**Use when:**
-- ✅ Growing team (3+ developers)
-- ✅ Services exceeding 500 lines
-- ✅ Complex domain boundaries
-- ✅ Need for schema standardization
-- ✅ Inconsistent data formats causing issues
+- `extract_filter_options(games)`
+  - **Purpose**: Extract available filter options from game data
+  - **Returns**: Lists of characters, opponents, stages for UI dropdowns
 
----
+- `calculate_filtered_stats(games, filter_options)`
+  - **Purpose**: Calculate statistics from filtered game data
+  - **Returns**: Win rates and breakdowns for filtered results
 
-## Domain Service Pattern (NEW)
+#### **Server & Admin Functions**
+- `process_server_statistics()`
+  - **Purpose**: Server-wide statistics for admin/API endpoints
+  - **Returns**: Total clients, games, players, server status
 
-For complex domains, we use the **Domain Service Pattern** with standardized schemas to eliminate data format inconsistencies and improve maintainability.
+- `validate_api_key(api_key)`
+  - **Purpose**: API key validation for authentication
+  - **Returns**: Client info if valid, None if invalid
 
-### **Standard Domain Structure**
+#### **File Management Functions**
+- `get_client_files(client_id, limit)`
+  - **Purpose**: Retrieve files uploaded by specific client
+  - **Returns**: List of file metadata with upload dates
 
-Every domain service follows this exact structure:
+- `get_file_details(file_id, client_id)`
+  - **Purpose**: Get detailed info about specific uploaded file
+  - **Returns**: File metadata or access error
 
-```
-backend/services/{domain}/
-├── __init__.py          # 🚪 PUBLIC EXPORTS - What other code can import
-├── schemas.py           # 📋 DATA DEFINITIONS - Pure data structures only
-├── validation.py        # ✅ VALIDATION LOGIC - Business rules and input validation  
-├── service.py           # 🎯 ORCHESTRATORS - Main entry points (10-20 lines each)
-├── processors.py        # ⚙️ BUSINESS LOGIC - Core operations and processing
-└── README.md           # 📖 DOMAIN DOCS - Usage examples and API reference
-```
+### **`web_service.py` - Web Business Logic** ✅
+**Purpose**: HTML page rendering and template data preparation
 
-### **File Responsibilities**
+#### **Page Data Preparation**
+- `prepare_homepage_data()`
+  - **Purpose**: Homepage template data (recent games, top players, stats)
+  - **Returns**: Dict with all homepage sections populated
 
-#### **`schemas.py` - Data Definitions ONLY**
-**Purpose**: Define data structures and their serialization methods
-**Contains**:
-- Dataclass definitions with type hints
-- Enums and constants  
-- Data conversion methods (`to_dict()`, `from_upload_data()`)
-- Field mappings and computed properties
+- `prepare_all_players_data()`
+  - **Purpose**: Players listing page with pagination and search
+  - **Returns**: Formatted player list with stats and encoding
 
-**Rules**:
-- ✅ Pure data structure definitions
-- ✅ Data transformation methods (format conversion)
-- ✅ Enum conversion helpers  
-- ❌ NO validation logic
-- ❌ NO business rules
-- ❌ NO external dependencies (database, logging, etc.)
+#### **Player Page Processing**
+- `process_player_profile_request(encoded_player_code)`
+  - **Purpose**: Basic player profile page data
+  - **Returns**: Player stats, recent games, character usage
+  - **Error Handling**: Uses Flask abort() for 404/500 errors
 
-#### **`validation.py` - Validation Logic ONLY**
-**Purpose**: Input validation and business rule enforcement
-**Contains**:
-- Business rule validation functions
-- Input format validation
-- Data integrity checks
-- Custom validation exceptions
+- `process_player_detailed_request(encoded_player_code)`
+  - **Purpose**: Detailed player analysis page with filters
+  - **Returns**: Comprehensive stats with filter options
+  - **Recently Fixed**: Now handles request context for filter parameters
 
-**Rules**:
-- ✅ Business rule enforcement
-- ✅ Input validation logic
-- ✅ Data integrity checks
-- ✅ Can import from schemas.py
-- ❌ NO data processing (use processors.py)
-- ❌ NO database operations
-- ❌ NO orchestration logic
-
-#### **`service.py` - Orchestrators ONLY**
-**Purpose**: Main entry points that coordinate workflows
-**Contains**:
-- Public API functions (orchestrators)
-- High-level error handling
-- Response formatting helpers
-- Workflow coordination
-
-**Rules**:
-- ✅ Orchestrator functions (10-20 lines max)
-- ✅ Delegate to validation.py and processors.py
-- ✅ Handle domain-level errors
-- ✅ Create standardized responses
-- ❌ NO complex business logic (use processors.py)
-- ❌ NO direct database calls (use processors.py)
-- ❌ NO detailed validation (use validation.py)
-
-#### **`processors.py` - Business Logic ONLY**
-**Purpose**: Core business operations and data processing
-**Contains**:
-- Business logic implementation
-- Database operations
-- External service calls
-- Data transformation
-- Side effect handling
-
-**Rules**:
-- ✅ Complex business logic
-- ✅ Database operations
-- ✅ External service integration
-- ✅ Data processing and transformation
-- ✅ Can import schemas, database, utils, config
-- ❌ NO input validation (trust validation.py)
-- ❌ NO orchestration logic (single responsibility)
-- ❌ NO HTTP concerns (request/response handling)
-
-#### **`__init__.py` - Public Exports ONLY**
-**Purpose**: Define what other modules can import
-**Contains**:
-- Import statements for public functions
-- `__all__` list defining public API
-- Domain-level docstring
-
-**Rules**:
-- ✅ Export ONLY public orchestrator functions
-- ✅ Maintain backward compatibility
-- ✅ Clear domain documentation
-- ❌ NO business logic
-- ❌ NO complex imports
-
-### **Domain Service Benefits**
-
-#### **For Developers**
-- ✅ **Predictable Structure** - Always know where to find/add code
-- ✅ **Clear Responsibilities** - Each file has single, well-defined purpose
-- ✅ **Easy Testing** - Test schemas, validation, processing independently
-- ✅ **Consistent Patterns** - Same structure across all domains
-
-#### **For Codebase**
-- ✅ **Schema Standardization** - Eliminates inconsistent data formats
-- ✅ **Reduced Complexity** - Large functions broken into focused pieces
-- ✅ **Better Reusability** - Validation and processing logic can be reused
-- ✅ **Improved Maintainability** - Easy to modify individual components
-
-#### **For Team**
-- ✅ **Faster Onboarding** - New developers know exactly how to structure code
-- ✅ **Better Code Reviews** - Clear expectations for function size and responsibility
-- ✅ **Easier Collaboration** - Consistent patterns reduce cognitive load
-- ✅ **Scalable Architecture** - Easy to add new domains as project grows
+#### **Data Processing Helpers**
+- `prepare_standard_player_template_data(player_code, encoded_player_code)`
+  - **Purpose**: Common player page data structure
+  - **Returns**: Standardized player data for templates
 
 ---
 
-## Current Services
+## **Domain Services** (New Pattern - Schema-Driven)
 
-### Core Services (Monolithic Approach)
-
-#### `api_service.py` - API Business Logic
-**Purpose**: Business logic for JSON API endpoints
-
-**Key Responsibilities:**
-- Player data processing and analysis
-- ~~Game upload and file processing~~ (🔄 Moving to upload domain)
-- Client registration and management
-- Advanced filtering and statistics
-
-**Major Functions:**
-- ~~`process_combined_upload()` - Handle games and files upload~~ (🔄 Moved to upload domain)
-- `process_detailed_player_data()` - Advanced player analysis
-- `process_player_basic_stats()` - Basic player statistics
-- `register_or_update_client()` - Client management
-
-#### `web_service.py` - Web Business Logic  
-**Purpose**: Business logic for HTML page rendering
-
-**Key Responsibilities:**
-- Template data preparation
-- Player profile data assembly
-- Homepage statistics calculation
-- Navigation and redirect logic
-
-**Major Functions:**
-- `prepare_homepage_data()` - Homepage template data
-- `prepare_all_players_data()` - Players listing data
-- `process_player_profile_request()` - Player profile handling
-- `process_player_detailed_request()` - Detailed analysis handling
-
-### Domain Services (New Approach)
-
-#### `upload/` - Upload Domain Service
+### **`upload/` - Upload Domain Service** ✅ **COMPLETE**
 **Purpose**: Handle all upload-related business logic with standardized schemas
 
-**Key Responsibilities:**
-- Combined upload processing (games + files + client info)
-- Upload data validation and normalization
-- Game data schema standardization
-- Upload result processing and error handling
+#### **Main Orchestrator Functions**
+- `process_combined_upload(client_id, upload_data)`
+  - **Purpose**: Main upload orchestrator handling games + files + client info
+  - **Input**: Combined upload data with validation
+  - **Returns**: Standardized upload result with detailed breakdown
+  - **Benefits**: Eliminates result vs placement confusion via schemas
 
-**Major Functions:**
-- `process_combined_upload()` - Main upload orchestrator with schema validation
+- `upload_games_for_client(client_id, games_data)`
+  - **Purpose**: Process game data uploads for specific client
+  - **Input**: List of game data with player information
+  - **Returns**: Upload results with success/duplicate/error counts
 
-**Benefits Achieved:**
-- ✅ **Eliminates result vs placement confusion** - Standardized in schemas
-- ✅ **Computed display fields** - `stage_name`, `game_length_seconds` automatically available
-- ✅ **Type safety** - Clear data contracts with validation
-- ✅ **Consistent error handling** - Structured validation messages
+- `process_file_upload(client_id, file_info, file_content)`
+  - **Purpose**: Handle individual file upload with metadata
+  - **Input**: File data and content for processing
+  - **Returns**: File upload result with generated ID
+
+#### **Schema Benefits Achieved**
+- ✅ **Standardized game data** with computed display fields
+- ✅ **Type safety** through validation and clear contracts
+- ✅ **Consistent error handling** with structured messages
+- ✅ **Automatic field computation** (stage names, game length, etc.)
+
+#### **Domain Structure**
+```
+upload/
+├── schemas.py          # Data structures and validation schemas  
+├── validation.py       # Business rule validation
+├── service.py          # Main orchestrator functions (public API)
+├── processors.py       # Core business logic and database operations
+└── __init__.py         # Public exports
+```
+
+### **`client/` - Client Domain Service** ✅ **COMPLETE**
+**Purpose**: Complete client lifecycle management and authentication
+
+#### **Main Orchestrator Functions**
+- `register_client(client_data, registration_key)`
+  - **Purpose**: Register new client with API key generation
+  - **Input**: Client registration data with optional registration key
+  - **Returns**: Client ID and generated API key
+  - **Recently Fixed**: Proper API key file generation (was writing None)
+
+- `authenticate_client(api_key)`
+  - **Purpose**: Validate API key and return client information
+  - **Input**: API key string for validation
+  - **Returns**: Client data if valid, error if invalid
+
+- `update_client_info(client_id, update_data)`
+  - **Purpose**: Update client information (hostname, version, etc.)
+  - **Input**: Client ID and fields to update
+  - **Returns**: Update success confirmation
+
+- `get_client_details(client_id)`
+  - **Purpose**: Retrieve complete client information
+  - **Input**: Client ID for lookup
+  - **Returns**: Full client data including registration date
+
+- `refresh_api_key(client_id)`
+  - **Purpose**: Generate new API key for existing client
+  - **Input**: Client ID for key regeneration
+  - **Returns**: New API key and update confirmation
+
+#### **Authentication & Security**
+- **API Key Generation**: Secure random key generation with file storage
+- **Validation**: Client data validation with business rules
+- **Security**: Prevents duplicate registrations and invalid updates
+
+#### **Domain Structure**
+```
+client/
+├── schemas.py          # Client data structures and registration formats
+├── validation.py       # Client validation rules and security checks
+├── service.py          # Main client orchestrator functions (public API)  
+├── processors.py       # Database operations and API key management
+└── __init__.py         # Public exports
+```
 
 ---
 
-## Orchestrator Pattern
+## **Support Layers** 🔧
 
-All service functions follow the **Orchestrator Pattern** for maintainable, testable code. See [ORCHESTRATOR_PATTERN.md](ORCHESTRATOR_PATTERN.md) for detailed implementation guidelines.
+### **`database.py` - Data Access Layer** ✅
+**Current Implementation**: Uses simplified `backend.db` layer
 
-### Pattern Summary
+#### **Main Functions**
+- `execute_query(category, query_name, params, fetch_one=False)`
+  - **Purpose**: Execute external SQL queries with parameters
+  - **Input**: SQL category, query name, and parameters
+  - **Returns**: Query results as list of dicts or single dict
 
+#### **SQL Integration**
+- **External SQL Files**: All queries stored in organized `sql/` directory
+- **Dynamic Discovery**: SQL files automatically available after creation
+- **Template Support**: Use `{variable}` placeholders for flexible queries
+- **Category Organization**: Queries organized by functionality (games, clients, files)
+
+### **`utils.py` - Shared Utilities** ✅
+**Purpose**: Data processing and helper functions used across services
+
+#### **Game Processing Functions**
+- `process_raw_games_for_player(raw_games, target_player_tag)`
+  - **Purpose**: Convert raw database games to player-specific format
+  - **Returns**: Processed games with nested player/opponent structure
+  - **Recently Fixed**: Character data now properly nested in player object
+
+- `parse_player_data_from_game(game_data)`
+  - **Purpose**: Parse JSON player data from game records
+  - **Returns**: List of player data dictionaries
+
+#### **Player Tag Functions**  
+- `encode_player_tag(player_tag)` / `decode_player_tag(encoded_tag)`
+  - **Purpose**: URL-safe encoding/decoding of player tags
+  - **Usage**: Handle special characters in URLs (# becomes %23)
+
+#### **Statistics Functions**
+- `calculate_win_rate(wins, total_games)`
+  - **Purpose**: Safe win rate calculation with error handling
+  - **Returns**: Decimal win rate (0.0 to 1.0)
+
+### **`config.py` - Configuration Management** ✅
+**Purpose**: Centralized application configuration
+
+#### **Main Functions**
+- `get_config()` - Main configuration object with all settings
+- `init_logging()` - Configure logging system for application
+- `get_database_path()` - Database file location for data storage  
+- `get_downloads_dir()` - Downloads directory for static files
+
+---
+
+## **Routes Layer** 🌐
+**Purpose**: HTTP request/response handling - delegates to services
+
+### **Route Organization**
+- **`web_routes.py`**: HTML page routes (player pages, homepage, etc.)
+- **`api_routes.py`**: JSON API endpoints with authentication
+- **`static_routes.py`**: File serving for downloads and uploads
+
+### **Route Pattern**
 ```python
-def public_service_function(main_args):
-    """Orchestrator - coordinates the workflow (10-20 lines)."""
+@web_bp.route('/player/<encoded_player_code>/detailed')
+def player_detailed(encoded_player_code):
+    """Route handler - thin controller pattern."""
     try:
-        validated_data = _validate_inputs(main_args)
-        processed_data = _process_main_logic(validated_data)
-        _handle_side_effects(processed_data)
-        return _create_response(processed_data)
-    except SpecificError as e:
-        return _handle_specific_error(e)
+        # Minimal validation
+        player_code = decode_player_tag(encoded_player_code)
+        
+        # Delegate to service layer
+        context_data = web_service.process_player_detailed_request(encoded_player_code)
+        
+        # Return response
+        return render_template('pages/player_detailed/player_detailed.html', **context_data)
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise
-
-def _validate_inputs(inputs):
-    """Helper - focused validation (5-15 lines)."""
-    pass
-
-def _process_main_logic(data):
-    """Helper - core business logic (5-15 lines)."""
-    pass
+        # Error handling
+        return handle_error(e)
 ```
 
 ---
 
-## Import Rules & Dependencies
+## **Service Usage Examples** 💡
 
-### Monolithic Services
-Services follow strict import hierarchy:
-
+### **API Endpoint Implementation**
 ```python
-# ✅ Services can import:
-from backend.database import *    # Data access functions
-from backend.utils import *       # Utility functions
-from backend.config import *      # Configuration
-import json, datetime, etc.       # Standard library
-
-# ❌ Services cannot import:
-from backend.routes import *      # Routes import services, not vice versa
-from other_service import *       # Services should not import each other
+# In api_routes.py
+@api_bp.route('/player/<encoded_player_code>/detailed', methods=['GET', 'POST'])
+def player_detailed_stats(encoded_player_code):
+    # Get filters from request (GET params or POST JSON)
+    if request.method == 'POST':
+        filter_data = request.get_json() or {}
+        character = filter_data.get('character', 'all')
+        opponent_character = filter_data.get('opponent_character', 'all')
+    else:
+        character = request.args.get('character', 'all')
+        opponent_character = request.args.get('opponent_character', 'all')
+    
+    # Delegate to service layer
+    player_code = decode_player_tag(encoded_player_code)
+    detailed_stats = api_service.process_detailed_player_data(
+        player_code, character, opponent, stage, limit, opponent_character
+    )
+    
+    return jsonify(detailed_stats)
 ```
 
-### Domain Services
-Domain services have additional import rules:
-
+### **Client Registration Example**
 ```python
-# ✅ Domain files can import:
-# schemas.py: No external imports (pure data structures)
-# validation.py: Can import from .schemas
-# service.py: Can import from .validation, .processors
-# processors.py: Can import from .schemas, backend.database, backend.utils, backend.config
-
-# ✅ Cross-domain communication:
-from backend.services.other_domain import public_function  # Use public APIs only
-
-# ❌ Domain files cannot import:
-from .processors import private_function  # Don't import private functions across files
-from backend.routes import *              # Routes import services, not vice versa
+# In api_routes.py
+@api_bp.route('/clients/register', methods=['POST'])
+def client_registration():
+    client_data = request.json
+    registration_key = request.headers.get('X-Registration-Key')
+    
+    # Delegate to client domain service
+    result = client_service.register_client(client_data, registration_key)
+    
+    if result.get('success'):
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
 ```
 
-### Service Communication
-When services need to share functionality:
-1. **Extract to utils** - If it's a pure function without side effects
-2. **Extract to database** - If it's data access logic
-3. **Use domain public APIs** - Import from other domain's public exports
-4. **Create shared service** - If it's complex business logic used by multiple domains
+### **Upload Processing Example**
+```python
+# In api_routes.py
+@api_bp.route('/games/upload', methods=['POST'])
+@require_api_key
+def games_upload(client_id):
+    upload_data = request.get_json()
+    
+    # Delegate to upload domain service
+    result = upload_service.process_combined_upload(client_id, upload_data)
+    
+    return jsonify(result)
+```
+
+### **Web Page Example**
+```python
+# In web_routes.py
+@web_bp.route('/player/<encoded_player_code>')
+def player_basic(encoded_player_code):
+    try:
+        # Delegate to web service
+        context_data = web_service.process_player_profile_request(encoded_player_code)
+        
+        # Render template with data
+        return render_template('pages/player_basic/player_basic.html', **context_data)
+    except Exception as e:
+        return render_template('pages/error_status/error_status.html',
+                              status_code=500, error_type="danger")
+```
 
 ---
 
-## Testing Strategy
+## **Data Flow Examples** 🔄
 
-### Service Layer Testing
-Services use **contract-based testing** focusing on inputs/outputs:
+### **Frontend Filter Request Flow**
+```
+Frontend JavaScript (POST /api/player/CODE/detailed)
+    ↓ JSON: {character: "Fox", opponent_character: "Falco"}
+API Route (api_routes.py)
+    ↓ delegates to
+API Service (process_detailed_player_data)
+    ↓ calls helpers
+Filter Functions (_apply_comprehensive_filters)
+    ↓ access data
+Database Layer (execute_query)
+    ↓ loads SQL
+External SQL File (games/select_by_player.sql)
+    ↓ returns processed data
+Frontend Updates (charts, tables, filter options)
+```
 
+### **Client Registration Flow**
+```
+Client Application (POST /api/clients/register)
+    ↓ JSON: {client_name: "MyApp", version: "1.0.0"}
+API Route (client_registration)
+    ↓ delegates to
+Client Domain Service (register_client)
+    ↓ orchestrates
+Validation (validate_client_registration_data)
+    ↓ then
+Processors (create_client_in_database + generate_api_key)
+    ↓ creates
+Database Record + API Key File
+    ↓ returns
+{success: true, client_id: "...", api_key: "..."}
+```
+
+### **Game Upload Flow**
+```
+Client Upload (POST /api/games/upload with API key)
+    ↓ JSON: {games: [...], files: [...]}
+API Route (games_upload)
+    ↓ authenticates via @require_api_key
+Upload Domain Service (process_combined_upload)
+    ↓ orchestrates
+Schemas (normalize game data formats)
+    ↓ then
+Validation (business rules + data integrity)
+    ↓ then  
+Processors (database operations + file handling)
+    ↓ returns
+{success: true, games_processed: 5, files_uploaded: 2}
+```
+
+---
+
+## **Migration Status & Future Plans** 🗺️
+
+### **Current State: Hybrid Architecture**
+- ✅ **Monolithic Services**: Stable, well-tested, handling core functionality
+- ✅ **Domain Services**: New pattern for complex areas (client, upload)
+- 🔄 **Gradual Migration**: Moving complex logic to domain pattern over time
+
+### **Migration Candidates**
+
+#### **Player Domain** (High Priority)
+**Current**: Scattered across api_service.py and web_service.py
+**Proposed**: `backend/services/player/`
+- `get_player_stats()`
+- `get_detailed_analysis()`  
+- `process_player_search()`
+- **Benefits**: Standardized player data schemas, better caching
+
+#### **Stats Domain** (Medium Priority)
+**Current**: Mixed into various services
+**Proposed**: `backend/services/stats/`
+- `get_server_statistics()`
+- `calculate_leaderboards()`
+- `generate_analytics_reports()`
+- **Benefits**: Centralized statistics logic, performance optimization
+
+#### **File Domain** (Low Priority)
+**Current**: Basic file handling in api_service.py
+**Proposed**: `backend/services/files/`
+- `process_file_upload()`
+- `manage_file_storage()`
+- `handle_file_downloads()`
+- **Benefits**: Advanced file processing, better storage management
+
+### **Service Architecture Evolution**
+```
+Current State:
+├── Monolithic Services (70% of functionality)
+├── Domain Services (30% of functionality)
+└── Support Layers (100% stable)
+
+Target State:
+├── Domain Services (80% of functionality)  
+├── Monolithic Services (20% of simple functionality)
+└── Support Layers (enhanced with caching)
+```
+
+---
+
+## **Service Dependencies** 📊
+
+### **Import Hierarchy (Enforced)**
+```
+Routes Layer
+    ↓ can import
+Service Layer (all services)
+    ↓ can import
+Support Layer (database, utils, config)
+    ↓ uses
+External Resources (SQL files, static files)
+```
+
+### **Cross-Service Communication**
 ```python
+# ✅ Allowed: Routes import any service
+from backend.services import api_service, web_service
+from backend.services.client import register_client
+
+# ✅ Allowed: Services import support layers
+from backend.db import execute_query
+from backend.utils import process_raw_games_for_player
+
+# ✅ Allowed: Domain services use other domain public APIs
+from backend.services.upload import process_file_upload
+
+# ❌ Forbidden: Services import routes
+# ❌ Forbidden: Support layers import services  
+# ❌ Forbidden: Circular imports between services
+```
+
+### **Database Dependencies**
+- **All Services** → `backend.db.execute_query()`
+- **All SQL** → External files in `sql/` directory
+- **SQL Organization**: `sql/{category}/{operation}.sql`
+- **Template Support**: `{variable}` substitution in SQL files
+
+---
+
+## **Testing Strategy** 🧪
+
+### **Service Layer Testing**
+```python
+# Contract-based testing - validate inputs/outputs
 def test_service_function_contract():
-    """Test that service function maintains expected contract."""
-    # Arrange
-    test_input = create_test_data()
-    
-    # Act
+    # Test that function maintains expected contract
     result = service_function(test_input)
-    
-    # Assert contract
     assert isinstance(result, dict)
-    assert 'success' in result
-    assert 'data' in result or 'error' in result
+    assert 'success' in result or 'error' in result
 ```
 
-### Domain Service Testing
-Domain services add schema-focused testing:
-
+### **Domain Service Testing**
 ```python
+# Schema-focused testing - ensure data standardization
 def test_domain_schema_standardization():
-    """Test that schemas eliminate data format inconsistencies."""
-    # Test various input formats are normalized
-    formats = [
-        {'player_tag': 'P1', 'result': 'Win'},
-        {'player_tag': 'P1', 'placement': 1},
-        {'player_tag': 'P1', 'result': 'win', 'placement': 2}
-    ]
-    
-    for format_data in formats:
-        schema_obj = PlayerSchema.from_input_data(format_data)
-        assert isinstance(schema_obj.result, GameResult)  # Standardized enum
+    # Test that various input formats are normalized
+    schema_obj = DomainSchema.from_input_data(test_data)
+    assert isinstance(schema_obj.result, StandardizedEnum)
 ```
 
-### Helper Function Testing
-Test orchestrator helpers independently:
-
+### **Integration Testing**
 ```python
-def test_validate_inputs():
-    """Test validation logic in isolation."""
-    # Test with valid data
-    valid_result = _validate_inputs(valid_data)
-    assert valid_result is not None
-    
-    # Test with invalid data
-    with pytest.raises(ValidationError):
-        _validate_inputs(invalid_data)
-```
-
-See [tests/README.md](../tests/README.md) for complete testing guidelines.
-
----
-
-## Migration Path
-
-### When to Migrate to Domain Services
-
-**Immediate candidates:**
-- ✅ **Upload domain** - Complex data formats, validation issues
-- 🔄 **Player domain** - Multiple data processing functions
-- 🔄 **Client domain** - Registration and management logic
-
-**Indicators for migration:**
-- Service file exceeds 500 lines
-- Inconsistent data formats causing bugs
-- Multiple developers working on same domain
-- Complex validation requirements
-- Need for schema standardization
-
-### Migration Process
-
-#### **Phase 1: Create Domain Structure**
-1. Create domain directory with 5 required files
-2. Implement schemas first (data structures)
-3. Move validation logic to validation.py
-4. Create orchestrators in service.py
-5. Move business logic to processors.py
-
-#### **Phase 2: Update Integration Points**
-1. Update route imports to use domain services
-2. Add domain exports to main services `__init__.py`
-3. Update cross-service dependencies
-4. Add comprehensive tests
-
-#### **Phase 3: Clean Up**
-1. Remove old functions from monolithic services
-2. Update documentation
-3. Monitor for any integration issues
-
-### Backward Compatibility
-During migration, maintain compatibility through main services `__init__.py`:
-
-```python
-# backend/services/__init__.py
-# Legacy imports (monolithic services)
-from .api_service import process_detailed_player_data
-from .web_service import prepare_homepage_data
-
-# New domain imports
-from .upload import process_combined_upload
-
-__all__ = [
-    # Domain services (new)
-    'process_combined_upload',
-    
-    # Legacy services (during transition)
-    'process_detailed_player_data',
-    'prepare_homepage_data',
-]
+# End-to-end workflow testing
+def test_complete_upload_workflow():
+    # Test complete upload from API call to database
+    response = client.post('/api/games/upload', 
+                          headers={'X-API-Key': test_key},
+                          json=test_upload_data)
+    assert response.status_code == 200
 ```
 
 ---
 
-## Adding New Services
+## **Performance Considerations** ⚡
 
-### 1. When to Create a New Service
-Create a new service when:
-- **Domain separation** - Distinct business domain (users, tournaments, etc.)
-- **Size concerns** - Existing service exceeds 500 lines
-- **Schema needs** - Need standardized data formats
-- **Team organization** - Different teams own different domains
-- **External integration** - Service handles external API integration
+### **Current Performance Profile**
+- **Response Times**: Sub-second for most operations
+- **Database**: SQLite with external SQL optimization
+- **Memory**: Efficient data processing with streaming for large uploads
+- **Caching**: Minimal (opportunity for improvement)
 
-### 2. Monolithic Service Creation Template
+### **Optimization Opportunities**
+1. **Query Result Caching**: Redis layer for expensive player statistics
+2. **Database Connection Pooling**: Better resource utilization
+3. **API Response Caching**: Cache stable data like player basic stats
+4. **Frontend Caching**: Browser caching for character icons and static data
 
-```python
-"""
-[Service Name] Service
-
-Business logic for [domain description].
-"""
-
-import logging
-from datetime import datetime
-from backend.config import get_config
-from backend.database import [required_functions]
-from backend.utils import [required_functions]
-
-# Configuration and logging
-config = get_config()
-logger = config.init_logging()
-
-# ============================================================================
-# Public API - Orchestrator Functions
-# ============================================================================
-
-def main_service_function(primary_args):
-    """
-    Main service function description.
-    
-    Args:
-        primary_args: Description of arguments
-    
-    Returns:
-        dict: Standardized response with success/error
-    """
-    try:
-        # Implementation using orchestrator pattern
-        pass
-    except Exception as e:
-        logger.error(f"Error in main_service_function: {str(e)}")
-        raise
-
-# ============================================================================
-# Helper Functions - Implementation Details
-# ============================================================================
-
-def _helper_function(data):
-    """Helper function with focused responsibility."""
-    pass
-```
-
-### 3. Domain Service Creation Process
-
-#### **Step 1: Create Directory Structure**
-```bash
-mkdir backend/services/{domain_name}
-touch backend/services/{domain_name}/__init__.py
-touch backend/services/{domain_name}/schemas.py
-touch backend/services/{domain_name}/validation.py
-touch backend/services/{domain_name}/service.py
-touch backend/services/{domain_name}/processors.py
-touch backend/services/{domain_name}/README.md
-```
-
-#### **Step 2: Implement in Order**
-1. **Schemas first** - Define data structures
-2. **Validation second** - Business rules and input validation
-3. **Processors third** - Core business logic
-4. **Service fourth** - Orchestrators that coordinate everything
-5. **Exports last** - Public API in `__init__.py`
-
-See the Domain Service Pattern section above for detailed file responsibilities.
-
-### 4. Service Registration
-When creating new services, update:
-1. **Import in routes** - Import service functions in relevant route files
-2. **Update main services init** - Add to `backend/services/__init__.py`
-3. **Update tests** - Add service layer tests for new functions
-4. **Document in README** - Update this README with new service description
+### **Scaling Considerations**
+- **Service Boundaries**: Ready for microservice extraction if needed
+- **Database**: External SQL makes PostgreSQL migration straightforward  
+- **Frontend**: Component architecture supports CDN and caching
+- **Observability**: Full tracing enables performance monitoring
 
 ---
 
-## Error Handling Patterns
+## **Troubleshooting Guide** 🔧
 
-### Standardized Error Responses
-All services return consistent error response format:
+### **Common Issues**
 
+#### **Character Names Show as "Unknown"**
+- **Cause**: Incorrect data structure access in filtering functions
+- **Fix**: Use `game.get('player', {}).get('character_name')` instead of `game.get('character_name')`
+- **Status**: ✅ Fixed in recent update
+
+#### **Frontend Filters Not Working**
+- **Cause**: Missing POST API endpoint for detailed filtering
+- **Fix**: Added POST support to `/api/player/{code}/detailed` route
+- **Status**: ✅ Fixed in recent update
+
+#### **Template Errors (JSON serialization)**
+- **Cause**: Missing `error_type` variable in error handlers
+- **Fix**: Add `error_type` parameter to all error template calls
+- **Status**: ✅ Fixed in recent update
+
+#### **Client Registration Fails**
+- **Cause**: API key generation writing None to files
+- **Fix**: Implemented proper client domain service with validation
+- **Status**: ✅ Fixed with client domain implementation
+
+### **Debugging Tips**
+1. **Check Service Layer First**: Most business logic issues are in services
+2. **Verify Data Structure**: Use logging to inspect actual data formats
+3. **Test API Endpoints**: Use curl to test API calls independently
+4. **Check SQL Files**: Verify external SQL queries are correct
+5. **Validate Imports**: Ensure using correct import patterns
+
+---
+
+## **Quick Reference** 📋
+
+### **Most Used Functions**
 ```python
-# Success response
-{
-    'success': True,
-    'data': {...},
-    'message': 'Operation completed successfully'
-}
+# Player analysis
+api_service.process_detailed_player_data(player_code, filters...)
+web_service.process_player_profile_request(encoded_player_code)
 
-# Error response
-{
-    'success': False,
-    'error': 'Error description',
-    'error_code': 'VALIDATION_ERROR',  # Optional
-    'details': {...}  # Optional additional context
-}
+# Upload processing  
+upload_service.process_combined_upload(client_id, upload_data)
+
+# Client management
+client_service.register_client(client_data, registration_key)
+client_service.authenticate_client(api_key)
+
+# Data access
+execute_query('games', 'select_by_player', (player_code,))
 ```
 
-### Error Logging Strategy
+### **Import Patterns**
 ```python
-def service_function(data):
-    try:
-        # Business logic
-        pass
-    except ValidationError as e:
-        # Log validation errors as warnings
-        logger.warning(f"Validation error in service_function: {str(e)}")
-        return {'success': False, 'error': str(e)}
-    except DatabaseError as e:
-        # Log database errors as errors
-        logger.error(f"Database error in service_function: {str(e)}")
-        return {'success': False, 'error': 'Database operation failed'}
-    except Exception as e:
-        # Log unexpected errors and re-raise
-        logger.error(f"Unexpected error in service_function: {str(e)}")
-        raise
+# Standard service imports
+from backend.services import api_service, web_service
+
+# Domain service imports
+from backend.services.client import register_client
+from backend.services.upload import process_combined_upload
+
+# Support layer imports
+from backend.db import execute_query
+from backend.utils import decode_player_tag
 ```
 
 ---
 
-## Performance Considerations
-
-### Caching Strategy
-Services should implement caching for expensive operations:
-
-```python
-from functools import lru_cache
-
-@lru_cache(maxsize=128)
-def _expensive_calculation(cache_key):
-    """Cache expensive calculations at service layer."""
-    pass
-```
-
-### Database Optimization
-- **Batch operations** when possible
-- **Use database indexes** effectively
-- **Limit result sets** with reasonable defaults
-- **Monitor query performance** through logging
-
-### Memory Management
-- **Stream large datasets** instead of loading entirely into memory
-- **Clean up temporary data** after processing
-- **Use generators** for large data processing
-
----
-
-## Observability Integration
-
-All services integrate with the observability stack:
-
-```python
-from backend.observability import trace_function
-
-@trace_function
-def service_function(data):
-    """Service function with automatic tracing."""
-    # Function automatically traced for performance monitoring
-    pass
-```
-
----
-
-## Contributing Guidelines
-
-### Code Style
-- Follow **orchestrator pattern** for complex functions
-- Use **descriptive function names** that indicate business purpose
-- Implement **comprehensive error handling**
-- Add **type hints** for function parameters and returns
-- Include **docstrings** with Args and Returns sections
-
-### Domain Service Requirements
-- **Schemas as requirement** - Every domain must have standardized schemas
-- **File separation** - Strict separation between schemas, validation, service, processors
-- **Public API design** - Only export orchestrator functions
-- **Backward compatibility** - Maintain imports during migration
-
-### Testing Requirements
-- **Service layer tests** for all public functions
-- **Schema tests** for data format standardization
-- **Helper function tests** for complex validation or processing logic
-- **Error scenario tests** for all expected error conditions
-- **Integration tests** for complete workflows
-
-### Review Process
-- **Code reviews** should verify orchestrator pattern usage
-- **Schema validation** - Ensure schemas eliminate data format inconsistencies
-- **Performance impact** consideration for new service functions
-- **Error handling** completeness and consistency
-- **Test coverage** requirements met
-
-This service layer architecture provides a scalable foundation for growing business logic while maintaining code quality, testability, and eliminating data format inconsistencies through standardized schemas.
+**Maintained by**: Gavin
+**Last Updated**: July 2025  
+**Version**: Current working state with recent fixes

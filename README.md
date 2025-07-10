@@ -1,342 +1,364 @@
 # Slippi Stats Server
 
-A comprehensive web application for collecting, storing, and analyzing Super Smash Bros. Melee game data from Slippi replays. Built with Flask and featuring a component-based frontend with real-time filtering and detailed player statistics.
+A comprehensive web application for analyzing Super Smash Bros. Melee replay data with advanced player statistics, interactive charts, and real-time filtering capabilities.
 
-## Overview
+## **Quick Start** 🚀
 
-Slippi Stats Server provides:
-- **Player Profile Pages** with comprehensive statistics and performance analysis
-- **Advanced Filtering System** for detailed matchup and character analysis  
-- **Real-time Data Visualization** with interactive charts and tables
-- **RESTful API** for programmatic access to game data
-- **Client Registration System** for automated replay collection
-
-## Quick Start
-
-### Prerequisites
-- Python 3.8+
-- SQLite 3 (included with Python)
-- Modern web browser with JavaScript enabled
-- Git (for development)
-
-### Windows Development Setup
-```cmd
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
-
-# Run the Windows setup script
-start_dev.bat
-```
-
-The development server will be available at: http://127.0.0.1:5000
-
-### Manual Setup (All Platforms)
+### **Development Setup**
 ```bash
-# Clone repository
-git clone <repository-url>
-cd slippi_stats
+# Clone and setup
+git clone <repository>
+cd slippi-stats-server
 
-# Create virtual environment
+# Windows (recommended)
+start_dev.bat
+
+# Manual setup
 python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
+source venv/bin/activate  # or venv\Scripts\activate.bat on Windows
 pip install -r requirements.txt
-
-# Run development server
 python app.py
 ```
 
-## Project Structure
+### **Access Points**
+- **Web Interface**: `http://localhost:5000`
+- **API Documentation**: See [API Reference](#api-reference) below
+- **Observability**: `docker-compose up -d` (optional)
 
-```
-slippi_stats/
-├── README.md                    # This file - project overview
-├── ARCHITECTURE.md              # High-level architecture overview
-├── MIGRATION_GUIDE.md           # Refactoring journey documentation
-├── CONTRIBUTING.md              # Contribution guidelines
-├── requirements.txt             # Python dependencies
-├── start_dev.bat               # Windows development script
-├── run_tests.bat               # Enhanced test runner with coverage
-├── app.py                      # Flask application entry point (lightweight)
-├── backend/                    # Backend modules (service-oriented architecture)
-│   ├── README.md              # Backend architecture details
-│   ├── config.py              # Configuration management
-│   ├── observability.py       # OpenTelemetry instrumentation
-│   ├── database.py            # Data access layer with external SQL
-│   ├── sql_manager.py         # Dynamic SQL file management
-│   ├── sql/                   # External SQL files organized by category
-│   │   ├── README.md          # SQL architecture and query management
-│   │   ├── schema/            # Database schema and indexes
-│   │   ├── games/             # Game-related queries
-│   │   ├── clients/           # Client management queries
-│   │   ├── api_keys/          # Authentication queries
-│   │   ├── files/             # File storage queries
-│   │   └── stats/             # Statistics and reporting queries
-│   ├── routes/                # Flask route blueprints
-│   │   ├── README.md          # Routes architecture details
-│   │   ├── __init__.py        # Blueprint registration
-│   │   ├── web_routes.py      # HTML page routes
-│   │   ├── api_routes.py      # JSON API routes
-│   │   ├── static_routes.py   # File serving routes
-│   │   └── error_handlers.py  # HTTP error handlers
-│   ├── web_service.py         # Web page business logic
-│   ├── api_service.py         # API business logic
-│   └── utils.py               # Shared utilities
-├── frontend/                  # Component-based frontend
-│   ├── README.md              # Frontend architecture details
-│   ├── base.html              # Foundation template
-│   ├── base.css               # Global styles
-│   ├── base.js                # Global utilities
-│   ├── components/            # Self-contained UI components
-│   │   └── README.md          # Component development guide
-│   ├── layouts/               # Component orchestration
-│   │   └── README.md          # Layout architecture guide
-│   └── pages/                 # Page-specific content
-│       └── README.md          # Page development guide
-├── tests/                     # Comprehensive testing framework
-│   ├── README.md              # Testing guide and architecture
-│   ├── conftest.py            # Test configuration and fixtures
-│   ├── pytest.ini            # Pytest configuration
-│   ├── test_service_layer.py  # ⚡ Business logic contracts (ENHANCED)
-│   ├── test_database_simple.py # 🔄 Database integration tests
-│   ├── test_api_endpoints.py  # 🔄 HTTP endpoints (EXPANDED)
-│   ├── test_web_pages.py      # 🔄 Web page rendering tests
-│   ├── test_utils_functions.py # ⚡ NEW: Utils function testing
-│   ├── test_upload_pipeline.py # 🔄 NEW: Upload workflow integration
-│   └── test_error_scenarios.py # ⚡ NEW: Error handling & edge cases
-└── observability/             # Observability configuration
-    ├── otel-collector-config.yaml  # OpenTelemetry collector setup
-    ├── prometheus.yml          # Metrics collection configuration
-    └── grafana/               # Dashboard definitions
-```
+## **Features** ✨
 
-## Architecture
-
-This project follows a **modular architecture** with clear separation of concerns and comprehensive observability:
-
-### Backend Architecture
-- **Service-Oriented Design**: Clean separation between web and API business logic
-- **External SQL Management**: SQL queries stored as external files with dynamic discovery
-- **Blueprint-Based Routing**: Organized route handlers with thin controllers
-- **Strict Import Hierarchy**: Enforced module dependencies prevent circular imports
-- **Comprehensive Testing**: Architecture-aligned testing with 75% coverage target
-
-### Frontend Architecture
-- **Component-Based System**: Self-contained UI components with clear interfaces
-- **Layout Orchestration**: Flexible layout system for component composition
-- **Progressive Enhancement**: Works without JavaScript, enhanced with it
-- **Bootstrap Foundation**: Responsive design with custom component styling
-
-### Observability Architecture
-- **Distributed Tracing**: OpenTelemetry instrumentation across all layers
-- **Business Metrics**: Custom metrics for games processed, API usage, performance
-- **Real-time Monitoring**: Grafana dashboards with automated alerting
-- **Development-Friendly**: Local observability stack with Docker
-
-## Development Status
-
-### ✅ Completed
-- **Backend Architecture**: Clean service-oriented design with separation of concerns
-- **Database Layer**: Pure data access with external SQL file management
-- **Routes Architecture**: Blueprint-based organization with thin route handlers
-- **Business Logic**: Separated into web and API service layers
-- **SQL Management**: Dynamic discovery and template support for external SQL files
-- **File Upload System**: Secure upload and storage with deduplication
-- **Configuration Management**: Centralized with environment variable support
-- **Error Handling**: Comprehensive validation and user feedback
-- **Observability**: OpenTelemetry instrumentation and monitoring stack
-- **Testing Framework**: Architecture-aligned testing with multiple categories
-- **Frontend Component System**: Component-based architecture with clear separation of concerns
-
-### 🔄 In Progress
-- **Test Coverage Improvement**: 51% → 75% coverage target
-- **Performance Optimization**: Database query optimization and caching
-
-### 📋 Planned
-- **Advanced Analytics**: Enhanced matchup analysis and player comparison tools
-- **Export Features**: Statistics export and tournament bracket system
-- **Admin Interface**: Web-based administration panel
-- **Database Migration System**: Versioned schema changes with rollback capability
-
-### 🎯 Recent Achievements
-- **Architecture Refactoring**: Successfully migrated from monolithic to service-oriented architecture
-- **SQL Externalization**: All database queries moved to organized external files
-- **Component System**: Frontend components now follow "Components Do, Layouts Share, Pages Orchestrate" principle
-- **Testing Infrastructure**: Comprehensive test categories aligned with architectural boundaries
-- **Documentation**: Complete documentation coverage for all architectural layers
-
-## Testing
-
-The project includes a comprehensive testing framework designed for confident refactoring:
-
-### Quick Start
-```bash
-# Run all tests
-run_tests.bat
-
-# Run specific test categories  
-run_tests.bat quick        # Fast service layer tests
-run_tests.bat api          # API endpoint tests
-run_tests.bat db           # Database integration tests
-run_tests.bat web          # Web page tests
-run_tests.bat utils        # Utils function tests
-run_tests.bat upload       # Upload pipeline tests
-run_tests.bat coverage     # Generate coverage report
-```
-
-### Test Categories & Coverage
-- **Service Layer Tests** (`tests/test_service_layer.py`) - Business logic contracts
-- **Utils Function Tests** (`tests/test_utils_functions.py`) - Data processing utilities
-- **Database Tests** (`tests/test_database_simple.py`) - SQL files and database operations  
-- **API Tests** (`tests/test_api_endpoints.py`) - HTTP endpoints and responses
-- **Upload Pipeline Tests** (`tests/test_upload_pipeline.py`) - Complete upload workflows
-- **Error Scenarios Tests** (`tests/test_error_scenarios.py`) - Edge cases and error handling
-- **Web Tests** (`tests/test_web_pages.py`) - Page rendering and navigation
-
-### Testing Philosophy
-The testing framework enables confident refactoring by:
-1. **Architecture Alignment**: Tests respect the service-oriented module hierarchy
-2. **Contract Focus**: Tests verify what functions return, not how they work
-3. **Fast Feedback**: Service layer tests run in <1 second for rapid development
-4. **Integration Coverage**: Database and API tests ensure components work together
-5. **Error Resilience**: Comprehensive error scenario testing
-
-### Coverage Goals
-- **Current**: 51% overall coverage
-- **Target**: 75% overall coverage
-- **Priority Areas**: 
-  - `web_service.py`: 21% → 60%
-  - `api_service.py`: 50% → 65%
-  - `utils.py`: 36% → 55%
-  - `api_routes.py`: 40% → 70%
-
-### Adding Tests
-See [tests/README.md](tests/README.md) for detailed guidance on:
-- When to add tests to each category
-- Test templates and examples
-- Best practices and troubleshooting
-- Integration with development workflow
-
-## Features
-
-### Player Analytics
+### **Player Analytics**
 - **Basic Profiles**: Win rates, character usage, recent games, performance highlights
-- **Detailed Analysis**: Advanced filtering by character, opponent, and matchup
+- **Advanced Filtering**: Filter by character, opponent, opponent character, stage, date range
 - **Performance Trends**: Time-series charts showing improvement over time
-- **Character Statistics**: Win rates and usage patterns for each character
-- **Rival Detection**: Identifies frequent opponents and challenging matchups
+- **Character Statistics**: Detailed win rates and usage patterns for each character
+- **Matchup Analysis**: Head-to-head performance against specific opponents
 
-### Data Management
+### **Data Management**
 - **Automated Collection**: Client applications upload replay data automatically
 - **File Upload System**: Secure upload and storage of .slp replay files
 - **API Authentication**: Secure API key system for client access
-- **Flexible Storage**: SQLite database with external SQL file management
 - **Data Validation**: Comprehensive validation and error handling
+- **Real-time Processing**: Immediate statistics updates after data upload
 
-### User Experience
-- **Responsive Design**: Bootstrap-based UI that works on all devices
-- **Character Icons**: Visual character representations throughout the interface
+### **User Experience**
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 - **Interactive Charts**: Chart.js powered visualizations with drill-down capabilities
+- **Character Icons**: Visual character representations throughout the interface
 - **Smart Search**: Flexible player search with case-insensitive matching
-- **Error Handling**: User-friendly error pages with helpful navigation
+- **Real-time Filtering**: Frontend filtering with instant results
 
-### Observability & Monitoring
-- **Distributed Tracing**: Request flow visibility across all application layers
-- **Business Metrics**: Games processed, files uploaded, API usage tracking
-- **Performance Monitoring**: Response times, database query performance, error rates
-- **Real-time Dashboards**: Grafana dashboards for operational insights
-- **Alerting**: Automated alerts for system health and performance issues
+## **Architecture** 🏗️
 
-## API Documentation
+### **Backend: Service-Oriented Architecture**
+```
+Routes → Services → Database → External SQL
+- Clean separation of concerns
+- External SQL file management
+- Hybrid monolithic + domain services
+- Comprehensive error handling
+```
 
-### Player Endpoints
-- `GET /api/player/{code}/stats` - Basic player statistics
-- `GET /api/player/{code}/games` - Paginated game history
-- `POST /api/player/{code}/detailed` - Advanced filtering and analysis
+### **Frontend: Component-Based Architecture**
+```
+Pages → Layouts → Components
+- Self-contained UI components
+- Progressive enhancement
+- Auto-initialization patterns
+- Asset ownership model
+```
 
-### Data Endpoints  
-- `POST /api/games/upload` - Upload game data (supports legacy and combined formats)
-- `POST /api/files/upload` - Upload replay files with metadata
-- `GET /api/files` - List uploaded files
-- `GET /api/files/{id}` - Get file details
-- `GET /api/stats` - Server statistics and health
-- `POST /api/clients/register` - Client registration
+**Detailed Documentation**: [ARCHITECTURE.md](ARCHITECTURE.md)
 
-### Authentication
-All data modification endpoints require API key authentication via `X-API-Key` header.
+## **API Reference** 📚
 
-## Contributing
+### **Player Endpoints**
+```bash
+# Basic player statistics
+GET /api/player/{player_code}/stats
 
-### Getting Started
-1. Fork the repository
-2. Create a feature branch
-3. Set up development environment using `start_dev.bat` or manual setup
-4. Optional: Start observability stack with `docker-compose up -d`
-5. Make your changes following the architecture patterns
-6. Test your changes thoroughly using `run_tests.bat`
-7. Submit a pull request
+# Advanced filtering and analysis
+POST /api/player/{player_code}/detailed
+Content-Type: application/json
+{
+  "character": "Fox",
+  "opponent": "all",
+  "opponent_character": "Falco",
+  "stage": "all",
+  "limit": 100
+}
 
-### Architecture Documentation
-- **High-level overview**: [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Migration journey**: [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)
-- **Contributing guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Backend development**: [backend/README.md](backend/README.md)
-- **Routes organization**: [backend/routes/README.md](backend/routes/README.md)
-- **SQL query management**: [backend/sql/README.md](backend/sql/README.md)
-- **Frontend architecture**: [frontend/README.md](frontend/README.md)
-- **Component development**: [frontend/components/README.md](frontend/components/README.md)
-- **Layout development**: [frontend/layouts/README.md](frontend/layouts/README.md)
-- **Page development**: [frontend/pages/README.md](frontend/pages/README.md)
-- **Testing guidelines**: [tests/README.md](tests/README.md)
+# Paginated game history
+GET /api/player/{player_code}/games?page=1&per_page=20
+```
 
-### Development Guidelines
-- **Backend**: Follow the established service layer pattern and module import hierarchy
-- **Routes**: Use blueprint organization with thin handlers delegating to services
-- **SQL**: Add new queries as external .sql files in appropriate categories
-- **Frontend**: Use the component-based architecture with self-contained packages
-- **Testing**: Add tests that align with the architectural boundaries
-- **Code Style**: Follow PEP 8 for Python, component patterns for frontend
-- **Observability**: Use tracing decorators and custom metrics for new features
+### **Data Management Endpoints**
+```bash
+# Client registration
+POST /api/clients/register
+Content-Type: application/json
+{
+  "client_name": "MyApp",
+  "version": "1.0.0",
+  "hostname": "my-computer"
+}
 
-## Configuration
+# Game data upload (requires API key)
+POST /api/games/upload
+X-API-Key: your-api-key-here
+Content-Type: application/json
+{
+  "games": [...],
+  "files": [...]
+}
 
-### Development
-For development, the application uses sensible defaults. No additional configuration required.
+# File upload (requires API key)
+POST /api/files/upload
+X-API-Key: your-api-key-here
+Content-Type: application/json
+{
+  "files": [...]
+}
+```
 
-### Production
+### **Server Information**
+```bash
+# Server statistics and health
+GET /api/server/stats
+
+# File listings (requires API key)
+GET /api/files
+X-API-Key: your-api-key-here
+```
+
+### **Authentication**
+All data modification endpoints require API key authentication via `X-API-Key` header. Register a client to receive an API key.
+
+## **Configuration** ⚙️
+
+### **Development**
+The application uses sensible defaults for development. No additional configuration required.
+
+### **Production**
 Set environment variables for production deployment:
-- `DATABASE_PATH`: Path to SQLite database file
-- `SECRET_KEY`: Flask secret key for session management
-- `API_KEY_LENGTH`: Length of generated API keys (default: 32)
-- `MAX_UPLOAD_SIZE`: Maximum upload size in bytes
-- `ENABLE_OBSERVABILITY`: Enable OpenTelemetry tracing (default: True)
 
-### Observability
-Configure observability stack:
-- `JAEGER_ENDPOINT`: Jaeger collector endpoint
-- `PROMETHEUS_ENDPOINT`: Prometheus metrics endpoint
-- `GRAFANA_ENDPOINT`: Grafana dashboard endpoint
+```bash
+# Database
+DATABASE_PATH=/path/to/database.db
 
-## License
+# Security
+SECRET_KEY=your-secret-key-here
+API_KEY_LENGTH=32
+
+# File Upload
+MAX_UPLOAD_SIZE=104857600  # 100MB
+UPLOADS_DIR=/path/to/uploads
+
+# Rate Limiting
+RATE_LIMIT_API=120
+RATE_LIMIT_UPLOADS=60
+RATE_LIMIT_REGISTRATION=10
+
+# Observability (optional)
+ENABLE_OBSERVABILITY=True
+JAEGER_ENDPOINT=http://localhost:14268/api/traces
+PROMETHEUS_ENDPOINT=http://localhost:9090
+```
+
+## **Development** 👨‍💻
+
+### **Project Structure**
+```
+slippi-stats-server/
+├── app.py                     # Flask application entry point
+├── backend/                   # Backend services and logic
+│   ├── routes/               # HTTP route handlers
+│   ├── services/             # Business logic (monolithic + domain)
+│   ├── db/                   # Database access layer
+│   ├── sql/                  # External SQL queries (organized by category)
+│   └── config.py             # Configuration management
+├── frontend/                  # Frontend templates and assets
+│   ├── components/           # Reusable UI components
+│   ├── layouts/              # Page layout templates
+│   ├── pages/                # Individual page templates
+│   └── static/               # CSS, JavaScript, images
+├── tests/                    # Test suite (51% coverage)
+└── docs/                     # Additional documentation
+```
+
+### **Development Guidelines**
+- **Backend**: Follow service layer patterns and external SQL organization
+- **Frontend**: Use component-based architecture with progressive enhancement
+- **Testing**: Add tests that align with architectural boundaries
+- **SQL**: Create external .sql files for all database queries
+- **Documentation**: Update relevant docs when making architectural changes
+
+### **Adding New Features**
+
+#### **New API Endpoint**
+1. Add route to `backend/routes/api_routes.py`
+2. Add business logic to appropriate service in `backend/services/`
+3. Create SQL queries in `backend/sql/` if needed
+4. Add authentication/rate limiting decorators
+5. Update API documentation
+6. Add comprehensive tests
+
+#### **New Web Page**
+1. Add route to `backend/routes/web_routes.py`
+2. Add template data logic to `backend/services/web_service.py`
+3. Create page template in `frontend/pages/`
+4. Add any required SQL queries
+5. Add service layer tests
+
+#### **New Frontend Component**
+1. Create component directory in `frontend/components/`
+2. Implement self-contained CSS, JS, and template files
+3. Add component to appropriate layout
+4. Follow progressive enhancement principles
+
+### **Testing**
+```bash
+# Run all tests
+python -m pytest
+
+# Run specific test categories
+python -m pytest tests/test_service_layer.py      # Fast service tests
+python -m pytest tests/test_database.py           # Database integration
+python -m pytest tests/test_api_endpoints.py      # API endpoint tests
+python -m pytest tests/test_web_pages.py          # Web page rendering
+
+# Coverage report
+python -m pytest --cov=backend --cov-report=html
+```
+
+**Current Coverage**: 51% (target: 75%)
+
+## **Documentation** 📖
+
+### **Core Documentation**
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete architectural reference
+- **[CHANGELOG.md](CHANGELOG.md)** - Project history and recent changes
+- **[SERVICE_DIRECTORY.md](SERVICE_DIRECTORY.md)** - Backend service catalog
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines
+
+### **Specialized Documentation**
+- **[backend/README.md](backend/README.md)** - Backend implementation details
+- **[frontend/README.md](frontend/README.md)** - Frontend architecture
+- **[tests/README.md](tests/README.md)** - Testing guidelines
+- **[backend/sql/README.md](backend/sql/README.md)** - SQL management
+
+## **Deployment** 🚀
+
+### **Production Deployment**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export DATABASE_PATH=/opt/slippi-server/data/database.db
+export SECRET_KEY=your-production-secret
+
+# Run with Gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+
+# Or use systemd service
+sudo systemctl start slippi-server.service
+```
+
+### **Docker Deployment**
+```bash
+# Build image
+docker build -t slippi-server .
+
+# Run container
+docker run -d \
+  -p 5000:5000 \
+  -v /data:/app/data \
+  -e DATABASE_PATH=/app/data/database.db \
+  slippi-server
+```
+
+### **Observability Stack** (Optional)
+```bash
+# Start monitoring stack
+docker-compose up -d
+
+# Access dashboards
+# Grafana: http://localhost:3000
+# Jaeger: http://localhost:16686
+# Prometheus: http://localhost:9090
+```
+
+## **Performance** ⚡
+
+### **Current Characteristics**
+- **Response Times**: Sub-second for most operations
+- **Database**: SQLite with optimized external SQL queries
+- **Concurrency**: Multi-worker Gunicorn deployment
+- **Caching**: Minimal (opportunity for improvement)
+- **Frontend**: Progressive loading with component-based architecture
+
+### **Scaling Considerations**
+- **Database**: External SQL makes PostgreSQL migration straightforward
+- **Services**: Clear boundaries enable microservice extraction
+- **Frontend**: Component architecture supports CDN deployment
+- **Monitoring**: Full observability stack for performance tracking
+
+## **Troubleshooting** 🔧
+
+### **Common Issues**
+
+#### **Server Won't Start**
+```bash
+# Check configuration
+python -c "from backend.config import get_config; print(get_config().__dict__)"
+
+# Check dependencies
+pip check
+
+# Check database
+ls -la data/database.db
+```
+
+#### **Frontend Filters Not Working**
+- Verify API endpoints are accessible: `curl http://localhost:5000/api/player/TEST%23123/detailed`
+- Check browser console for JavaScript errors
+- Ensure character data structure is correct
+
+#### **Upload Failures**
+- Verify API key is valid: `curl -H "X-API-Key: your-key" http://localhost:5000/api/files`
+- Check file size limits and content types
+- Review server logs for detailed error messages
+
+### **Getting Help**
+1. Check existing issues in the repository
+2. Review the troubleshooting section in [SERVICE_DIRECTORY.md](SERVICE_DIRECTORY.md)
+3. Enable debug logging: `export FLASK_ENV=development`
+4. Create detailed issue with error logs and steps to reproduce
+
+## **License** 📄
 
 This project is open source. Please see the LICENSE file for details.
 
-## Support
+## **Contributing** 🤝
 
-For issues, feature requests, or questions:
-1. Check existing issues in the repository
-2. Create a new issue with detailed description
-3. Follow the contributing guidelines for code submissions
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup instructions
+- Code style guidelines
+- Architecture patterns to follow
+- Testing requirements
+- Pull request process
 
-### Development Support
-- **Architecture Questions**: See module-specific README files
-- **Testing Questions**: See [tests/README.md](tests/README.md)
-- **Component Development**: See [frontend/components/README.md](frontend/components/README.md)
-- **SQL Development**: See [backend/sql/README.md](backend/sql/README.md)
+### **Quick Contributing Guide**
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Follow the established architecture patterns
+4. Add tests for new functionality
+5. Update documentation as needed
+6. Submit a pull request with clear description
+
+---
+
+**Built with**: Flask, SQLite, Bootstrap, Chart.js, OpenTelemetry  
+**Architecture**: Service-oriented backend, component-based frontend  
+**Status**: Production-ready, actively maintained
