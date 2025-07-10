@@ -2,7 +2,7 @@
 API routes for Slippi Server.
 
 This module contains all API endpoints that return JSON responses.
-Uses ONLY api_service for business logic - no direct database imports.
+Uses ONLY service imports through backend.services - no direct imports.
 """
 
 import time
@@ -12,12 +12,10 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from backend.config import get_config
 from backend.utils import decode_player_tag
-import backend.services.api_service as api_service
-from backend.services import (
-    process_combined_upload,
-    upload_games_for_client, 
-    process_file_upload
-)
+
+# FIXED: Import ALL services through the main services module
+# This avoids circular imports and uses the proper domain exports
+import backend.services as services
 
 # Create blueprint for API routes
 api_bp = Blueprint('api', __name__)
@@ -35,10 +33,12 @@ def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = request.headers.get('X-API-Key')
-        # FIXED: Use service layer for validation
-        client_info = api_service.validate_api_key(api_key)
+        
+        client_info = services.authenticate_client(api_key)
+        
         if not client_info:
             abort(401, description="Invalid or missing API key")
+        
         kwargs['client_id'] = client_info.get('client_id')
         return f(*args, **kwargs)
     return decorated_function
@@ -52,7 +52,7 @@ def rate_limited(max_per_minute):
             client_id = kwargs.get('client_id')
             if not client_id:
                 api_key = request.headers.get('X-API-Key')
-                client_info = api_service.validate_api_key(api_key)
+                client_info = services.validate_api_key(api_key)
                 client_id = client_info.get('client_id') if client_info else 'anonymous'
             
             current_minute = int(time.time() / 60)
@@ -74,64 +74,121 @@ def rate_limited(max_per_minute):
     return decorator
 
 # =============================================================================
-# Player API Endpoints
+# Player Statistics Endpoints
 # =============================================================================
 
-@api_bp.route('/player/<encoded_player_code>/stats')
+@api_bp.route('/player/<encoded_player_code>/stats', methods=['GET'])
+@rate_limited(config.RATE_LIMIT_API)
 def player_stats(encoded_player_code):
     """Get basic player statistics."""
     try:
         player_code = decode_player_tag(encoded_player_code)
-        result = api_service.process_player_basic_stats(player_code)
-        if result is None:
-            return jsonify({'error': f"Player '{player_code}' not found"}), 404
-        return jsonify(result)
+        stats = services.process_player_basic_stats(player_code)
+        return jsonify(stats)
+    except ValueError:
+        abort(400, description="Invalid player code format")
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error fetching player stats: {str(e)}")
+        return jsonify({'error': 'Failed to fetch player statistics'}), 500
 
-@api_bp.route('/player/<encoded_player_code>/games')
-def player_games(encoded_player_code):
-    """Get paginated games for a player."""
+@api_bp.route('/player/<encoded_player_code>/detailed', methods=['GET'])
+@rate_limited(config.RATE_LIMIT_API)
+def player_detailed_stats(encoded_player_code):
+    """Get detailed player statistics and analysis."""
     try:
         player_code = decode_player_tag(encoded_player_code)
-        page = max(1, int(request.args.get('page', '1')))
         
-        result = api_service.process_paginated_player_games(player_code, page)
-        return jsonify(result)
+        # Get filter parameters
+        character = request.args.get('character', 'all')
+        opponent = request.args.get('opponent', 'all')
+        stage = request.args.get('stage', 'all')
+        limit = int(request.args.get('limit', 100))
+        
+        detailed_stats = services.process_detailed_player_data(
+            player_code, character, opponent, stage, limit
+        )
+        return jsonify(detailed_stats)
+    except ValueError:
+        abort(400, description="Invalid player code format")
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@api_bp.route('/player/<encoded_player_code>/detailed', methods=['POST'])
-def player_detailed_post(encoded_player_code):
-    """POST version of the detailed player API for complex filters."""
-    try:
-        player_code = decode_player_tag(encoded_player_code)
-        logger.info(f"API detailed stats POST request for player: '{player_code}'")
-        
-        filter_data = request.get_json() or {}
-        logger.info(f"POST Filters: {filter_data}")
-        
-        result = api_service.process_detailed_player_data(player_code, filter_data)
-        if result is None:
-            return jsonify({'error': f"Player '{player_code}' not found"}), 404
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error in detailed player POST API: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error fetching detailed player stats: {str(e)}")
+        return jsonify({'error': 'Failed to fetch detailed player statistics'}), 500
 
 # =============================================================================
-# Client Management Endpoints
+# Client Registration Endpoints  
 # =============================================================================
 
 @api_bp.route('/clients/register', methods=['POST'])
-def clients_register():
-    """Register a new client."""
-    client_data = request.json
-    registration_key = request.headers.get('X-Registration-Key')
-    result = api_service.process_client_registration(client_data, registration_key)
-    return jsonify(result)
+@rate_limited(config.RATE_LIMIT_REGISTRATION)
+def client_registration():
+    """Register or update client information using new client domain."""
+    try:
+        client_data = request.json
+        registration_key = request.headers.get('X-Registration-Key')
+        
+        # UPDATED: Use new client domain service
+        result = services.register_client(client_data, registration_key)
+        
+        # Handle response status codes
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            # Return appropriate error status
+            error_type = result.get('error_type', 'unknown')
+            if error_type == 'validation_error':
+                return jsonify(result), 400
+            elif error_type == 'api_key_error':
+                return jsonify(result), 500
+            else:
+                return jsonify(result), 500
+                
+    except Exception as e:
+        logger.error(f"Unexpected error in client registration: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error',
+            'error_type': 'server_error'
+        }), 500
+
+@api_bp.route('/clients/me', methods=['GET'])
+@require_api_key
+def get_my_client_info(client_id):
+    """Get current client information."""
+    try:
+        client_info = services.get_client_details(client_id)
+        
+        if not client_info:
+            return jsonify({'error': 'Client not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'client': client_info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting client info for {client_id}: {str(e)}")
+        return jsonify({'error': 'Failed to get client information'}), 500
+
+@api_bp.route('/clients/me/refresh-key', methods=['POST'])
+@require_api_key
+def refresh_my_api_key(client_id):
+    """Refresh API key for current client."""
+    try:
+        result = services.refresh_api_key(client_id)
+        
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            error_type = result.get('error_type', 'unknown')
+            if error_type == 'client_not_found':
+                return jsonify(result), 404
+            else:
+                return jsonify(result), 500
+                
+    except Exception as e:
+        logger.error(f"Error refreshing API key for {client_id}: {str(e)}")
+        return jsonify({'error': 'Failed to refresh API key'}), 500
+
 
 # =============================================================================
 # Data Upload Endpoints
@@ -150,7 +207,8 @@ def games_upload(client_id):
     """
     try:
         upload_data = _validate_upload_request()
-        result = process_combined_upload(client_id, upload_data)
+        # FIXED: Use services.process_combined_upload
+        result = services.process_combined_upload(client_id, upload_data)
         return jsonify(result)
         
     except (RequestEntityTooLarge, ValueError) as e:
@@ -179,7 +237,8 @@ def files_upload(client_id):
         # Add empty games array if not present
         upload_data.setdefault('games', [])
         
-        result = api_service.process_combined_upload(client_id, upload_data)
+        # FIXED: Use services.process_combined_upload
+        result = services.process_combined_upload(client_id, upload_data)
         return jsonify(result)
         
     except (RequestEntityTooLarge, ValueError) as e:
@@ -198,85 +257,47 @@ def files_upload(client_id):
 def files_list(client_id):
     """List files uploaded by the client."""
     try:
-        limit = min(100, int(request.args.get('limit', '50')))  # Max 100 files per request
-        
-        # FIXED: Use service layer instead of direct database call
-        result = api_service.get_client_files(client_id, limit=limit)
-        return jsonify(result)
-        
+        files = services.get_client_files(client_id)
+        return jsonify(files)
     except Exception as e:
         logger.error(f"Error listing files for client {client_id}: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@api_bp.route('/files/<file_id>', methods=['GET'])
-@require_api_key
-@rate_limited(30)  # 30 requests per minute for file details
-def file_details(file_id, client_id):
-    """Get details about a specific file."""
-    try:
-        # FIXED: Use service layer instead of direct database call
-        result = api_service.get_file_details(file_id, client_id)
-        
-        if result is None:
-            abort(404, description="File not found")
-            
-        if 'error' in result:
-            if 'Access denied' in result['error']:
-                abort(403, description="Access denied")
-            else:
-                abort(404, description="File not found")
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error getting file details for {file_id}: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to list files'}), 500
 
 # =============================================================================
 # Server Information Endpoints
 # =============================================================================
 
-@api_bp.route('/stats', methods=['GET'])
-def server_stats():
-    """Get server statistics."""
+@api_bp.route('/server/stats', methods=['GET'])
+@rate_limited(30)  # 30 requests per minute for server stats
+def server_statistics():
+    """Get server statistics and health information."""
     try:
-        stats = api_service.process_server_statistics()
+        stats = services.process_server_statistics()
         return jsonify(stats)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error fetching server statistics: {str(e)}")
+        return jsonify({'error': 'Failed to fetch server statistics'}), 500
 
-@api_bp.route('/admin/files/stats', methods=['GET'])
-def admin_file_stats():
-    """Get file storage statistics (admin endpoint)."""
-    try:
-        # FIXED: Use service layer instead of direct database call
-        stats = api_service.get_admin_file_stats()
-        return jsonify(stats)
-        
-    except Exception as e:
-        logger.error(f"Error getting file stats: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-    
-# ============================================================================
-# Route Helper Functions
-# ============================================================================
+# =============================================================================
+# Helper Functions
+# =============================================================================
 
 def _validate_upload_request():
     """Validate upload request data."""
     if not request.is_json:
-        raise ValueError("Content-Type must be application/json")
+        raise ValueError('Content-Type must be application/json')
     
-    upload_data = request.get_json()
-    if not upload_data:
-        raise ValueError("No upload data provided")
+    data = request.get_json()
+    if not isinstance(data, dict):
+        raise ValueError('Request data must be a JSON object')
     
-    return upload_data
+    return data
 
 def _handle_upload_error(error):
-    """Handle upload errors with appropriate HTTP responses."""
+    """Handle upload-specific errors."""
     if isinstance(error, RequestEntityTooLarge):
         return jsonify({'error': 'Upload too large'}), 413
     elif isinstance(error, ValueError):
         return jsonify({'error': str(error)}), 400
     else:
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': 'Upload error'}), 500

@@ -525,6 +525,71 @@ def prepare_standard_player_template_data(player_tag, encoded_player_code):
     except Exception as e:
         logger.error(f"Error preparing template data for {player_tag}: {str(e)}")
         return {'error': str(e)}
+    
+# Add this function to backend/services/web_service.py
+
+def prepare_server_stats_data():
+    """
+    Prepare data for server statistics page.
+    
+    Returns:
+        dict: Server statistics template data
+    """
+    try:
+        # Get basic server statistics
+        stats = get_database_stats()
+        
+        # Get recent upload activity
+        recent_uploads = execute_query('stats', 'recent_uploads', (), fetch_many=10)
+        
+        # Get file storage stats if available
+        try:
+            file_stats = execute_query('stats', 'file_stats_totals', (), fetch_one=True)
+        except Exception:
+            file_stats = {'total_files': 0, 'total_size': 0}
+        
+        # Process for template
+        return {
+            'server_stats': {
+                'total_games': stats.get('total_games', 0),
+                'total_players': stats.get('total_players', 0),
+                'total_clients': stats.get('total_clients', 0),
+                'total_files': file_stats.get('total_files', 0),
+                'total_file_size_mb': round(file_stats.get('total_size', 0) / (1024*1024), 2),
+                'database_size_mb': _get_database_size_mb()
+            },
+            'recent_uploads': recent_uploads or [],
+            'app_version': config.APP_VERSION,
+            'uptime': _calculate_server_uptime()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error preparing server stats data: {str(e)}")
+        return {
+            'server_stats': {
+                'total_games': 0,
+                'total_players': 0,
+                'total_clients': 0,
+                'total_files': 0,
+                'total_file_size_mb': 0,
+                'database_size_mb': 0
+            },
+            'recent_uploads': [],
+            'app_version': config.APP_VERSION,
+            'uptime': 'Unknown'
+        }
+
+def _get_database_size_mb():
+    """Get database file size in MB."""
+    try:
+        import os
+        db_path = config.get_database_path()
+        if os.path.exists(db_path):
+            size_bytes = os.path.getsize(db_path)
+            return round(size_bytes / (1024*1024), 2)
+        return 0
+    except Exception:
+        return 0
 
 
 # Helper functions that call the database layer
