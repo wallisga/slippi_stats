@@ -1,193 +1,164 @@
 """
 Upload Domain Schemas
 
-Pure data structure definitions. No validation logic.
+Data definitions and structures for upload processing.
+Pure data structures only - no business logic or validation.
 """
 
-from typing import Optional, List, Dict, Any, Union
-from dataclasses import dataclass, asdict, field
-from enum import Enum
-import json
-from datetime import datetime
 import uuid
+from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+from enum import Enum
 
 # ============================================================================
-# Enums and Constants (Data Definitions)
+# Enums and Constants
 # ============================================================================
 
 class GameResult(Enum):
-    WIN = "Win"
-    LOSS = "Loss"
+    """Standardized game result representation."""
+    WIN = "win"
+    LOSS = "loss"
+    NO_CONTEST = "no_contest"
     
     @classmethod
-    def from_placement(cls, placement: Union[int, str]) -> 'GameResult':
-        try:
-            placement_int = int(placement)
-            return cls.WIN if placement_int == 1 else cls.LOSS
-        except (ValueError, TypeError):
-            return cls.LOSS
-    
-    @classmethod  
-    def from_result_string(cls, result: Union[str, None]) -> 'GameResult':
-        if not result:
-            return cls.LOSS
-        result_str = str(result).lower().strip()
-        if result_str in ['win', 'winner', '1', 'true']:
+    def from_placement(cls, placement: int) -> 'GameResult':
+        """Convert placement to result."""
+        if placement == 1:
             return cls.WIN
-        return cls.LOSS
-
-# Character and stage mappings
-CHARACTER_MAP = {
-    'Fox': 20, 'Falco': 21, 'Marth': 22, 'Sheik': 23,
-    # ... etc
-}
-
-STAGE_MAP = {
-    28: 'Dream Land', 31: 'Battlefield', 32: 'Final Destination',
-    # ... etc
-}
+        elif placement in [2, 3, 4]:
+            return cls.LOSS
+        else:
+            return cls.NO_CONTEST
+    
+    @classmethod
+    def from_string(cls, result_str: str) -> 'GameResult':
+        """Convert string to result."""
+        if not result_str:
+            return cls.NO_CONTEST
+        
+        result_str = str(result_str).lower().strip()
+        if result_str in ['win', 'w', '1', 'victory']:
+            return cls.WIN
+        elif result_str in ['loss', 'lose', 'l', '0', 'defeat']:
+            return cls.LOSS
+        else:
+            return cls.NO_CONTEST
 
 # ============================================================================
-# Data Schema Classes (Pure Data Structures)
+# Data Structures
 # ============================================================================
 
 @dataclass
-class UploadPlayerData:
-    """Player data within a game upload."""
+class PlayerUploadData:
+    """Standardized player data structure."""
     player_tag: str
     character_name: str
-    character_id: int
-    result: GameResult
-    placement: int
-    stocks_remaining: Optional[int] = None
-    damage_dealt: Optional[float] = None
-    damage_taken: Optional[float] = None
+    placement: int = 0
+    result: GameResult = GameResult.NO_CONTEST
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        data = asdict(self)
-        data['result'] = self.result.value
-        return {k: v for k, v in data.items() if v is not None}
+    # Raw data for backward compatibility
+    raw_data: Dict[str, Any] = field(default_factory=dict)
     
     @classmethod
-    def from_upload_data(cls, raw_player: Dict[str, Any], default_placement: int = 1) -> 'UploadPlayerData':
+    def from_upload_data(cls, raw_player: Dict[str, Any]) -> 'PlayerUploadData':
         """Create from raw upload data."""
-        player_tag = str(raw_player.get('player_tag', '')).strip()
-        character_name = str(raw_player.get('character_name', 'Unknown')).strip()
-        character_id = CHARACTER_MAP.get(character_name, 0)
+        player_tag = raw_player.get('player_tag', '')
+        character_name = raw_player.get('character_name', 'Unknown')
+        placement = int(raw_player.get('placement', 0))
         
-        # Extract result using helper method
-        result = cls._extract_standardized_result(raw_player, default_placement)
-        placement = raw_player.get('placement', default_placement)
+        # Determine result from multiple possible fields
+        result = GameResult.NO_CONTEST
+        if 'result' in raw_player:
+            result = GameResult.from_string(raw_player['result'])
+        elif placement > 0:
+            result = GameResult.from_placement(placement)
         
         return cls(
             player_tag=player_tag,
             character_name=character_name,
-            character_id=character_id,
-            result=result,
             placement=placement,
-            stocks_remaining=raw_player.get('stocks_remaining'),
-            damage_dealt=raw_player.get('damage_dealt'),
-            damage_taken=raw_player.get('damage_taken')
+            result=result,
+            raw_data=raw_player
         )
     
-    @staticmethod
-    def _extract_standardized_result(raw_player: Dict[str, Any], default_placement: int) -> GameResult:
-        """Extract standardized result from various formats."""
-        if 'result' in raw_player and raw_player['result']:
-            return GameResult.from_result_string(raw_player['result'])
-        if 'placement' in raw_player:
-            return GameResult.from_placement(raw_player['placement'])
-        return GameResult.from_placement(default_placement)
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for database storage."""
+        return {
+            'player_tag': self.player_tag,
+            'character_name': self.character_name,
+            'placement': self.placement,
+            'result': self.result.value,
+            **self.raw_data  # Include all original data
+        }
 
 @dataclass
 class UploadGameData:
-    """Complete game data for upload processing."""
+    """Standardized game data structure."""
     game_id: str
     client_id: str
-    start_time: str
     stage_id: int
-    stage_name: str
-    game_length_frames: int
-    game_length_seconds: float
-    game_type: str = "versus"
-    players: List[UploadPlayerData] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    upload_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    start_time: str
+    game_length_frames: int = 0
+    player_data: List[PlayerUploadData] = field(default_factory=list)
     
-    @property
-    def player_count(self) -> int:
-        return len(self.players)
+    # Computed properties
+    stage_name: Optional[str] = None
+    game_length_seconds: float = 0.0
     
-    def get_player(self, player_tag: str) -> Optional[UploadPlayerData]:
-        player_tag_lower = player_tag.lower()
-        for player in self.players:
-            if player.player_tag.lower() == player_tag_lower:
-                return player
-        return None
-    
-    def to_database_format(self) -> Dict[str, Any]:
-        """Convert to database storage format."""
-        return {
-            'game_id': self.game_id,
-            'client_id': self.client_id,
-            'start_time': self.start_time,
-            'stage_id': self.stage_id,
-            'game_length_frames': self.game_length_frames,
-            'game_type': self.game_type,
-            'player_data': json.dumps([p.to_dict() for p in self.players]),
-            'full_data': json.dumps({
-                'game_id': self.game_id,
-                'start_time': self.start_time,
-                'stage_id': self.stage_id,
-                'stage_name': self.stage_name,
-                'game_length_frames': self.game_length_frames,
-                'game_length_seconds': self.game_length_seconds,
-                'game_type': self.game_type,
-                'player_data': [p.to_dict() for p in self.players],
-                'metadata': self.metadata
-            })
-        }
+    # Raw data for backward compatibility
+    raw_data: Dict[str, Any] = field(default_factory=dict)
     
     @classmethod
     def from_upload_data(cls, raw_game: Dict[str, Any], client_id: str) -> 'UploadGameData':
-        """Create from raw client upload data."""
-        game_id = str(raw_game.get('game_id', '')).strip()
-        if not game_id:
-            game_id = str(uuid.uuid4())
+        """Create from raw upload data."""
+        # Generate game ID if not provided
+        game_id = raw_game.get('game_id', str(uuid.uuid4()))
         
-        start_time = raw_game.get('start_time', datetime.now().isoformat())
+        # Extract basic fields
         stage_id = int(raw_game.get('stage_id', 0))
-        frames = int(raw_game.get('game_length_frames', 0))
-        game_type = str(raw_game.get('game_type', 'versus')).strip()
+        start_time = raw_game.get('start_time', datetime.now().isoformat())
+        game_length_frames = int(raw_game.get('game_length_frames', 0))
         
-        # Compute display fields
-        stage_name = STAGE_MAP.get(stage_id, f'Stage {stage_id}')
-        game_length_seconds = frames / 60.0 if frames > 0 else 0.0
+        # Process player data
+        player_data = []
+        for raw_player in raw_game.get('player_data', []):
+            player = PlayerUploadData.from_upload_data(raw_player)
+            player_data.append(player)
         
-        # Process players
-        players = []
-        raw_players = raw_game.get('player_data', [])
-        for i, raw_player in enumerate(raw_players):
-            player = UploadPlayerData.from_upload_data(raw_player, i + 1)
-            players.append(player)
+        # Compute derived fields
+        stage_name = _get_stage_name(stage_id)
+        game_length_seconds = game_length_frames / 60.0 if game_length_frames > 0 else 0.0
         
         return cls(
             game_id=game_id,
             client_id=client_id,
-            start_time=start_time,
             stage_id=stage_id,
+            start_time=start_time,
+            game_length_frames=game_length_frames,
+            player_data=player_data,
             stage_name=stage_name,
-            game_length_frames=frames,
             game_length_seconds=game_length_seconds,
-            game_type=game_type,
-            players=players,
-            metadata=raw_game.get('metadata', {})
+            raw_data=raw_game
         )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for database storage."""
+        return {
+            'game_id': self.game_id,
+            'client_id': self.client_id,
+            'stage_id': self.stage_id,
+            'start_time': self.start_time,
+            'game_length_frames': self.game_length_frames,
+            'stage_name': self.stage_name,
+            'game_length_seconds': self.game_length_seconds,
+            'player_data': [player.to_dict() for player in self.player_data],
+            **self.raw_data  # Include all original data
+        }
 
 @dataclass
 class CombinedUploadData:
-    """Combined upload payload schema."""
+    """Standardized combined upload data structure."""
     client_id: str
     client_info: Optional[Dict[str, Any]] = None
     games: List[UploadGameData] = field(default_factory=list)
@@ -224,3 +195,20 @@ class CombinedUploadData:
 class UploadValidationError(Exception):
     """Exception raised when upload validation fails."""
     pass
+
+# ============================================================================
+# Helper Functions (Data Processing Only)
+# ============================================================================
+
+def _get_stage_name(stage_id: int) -> Optional[str]:
+    """Get stage name from stage ID."""
+    # Stage ID to name mapping
+    stage_names = {
+        2: "Fountain of Dreams",
+        3: "Pokemon Stadium",
+        8: "Yoshi's Story",
+        28: "Dream Land N64",
+        31: "Battlefield",
+        32: "Final Destination"
+    }
+    return stage_names.get(stage_id, f"Unknown Stage ({stage_id})")

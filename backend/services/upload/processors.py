@@ -9,10 +9,9 @@ import logging
 import json
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any
 from backend.config import get_config
 from backend.db import connection, manager
-from backend.services.api_service import register_or_update_client
 from .schemas import CombinedUploadData, UploadGameData
 
 # Configuration  
@@ -21,6 +20,9 @@ logger = config.init_logging()
 
 mgr = manager.SQLManager()
 
+# ============================================================================
+# Main Processing Functions
+# ============================================================================
 
 def process_upload_components(client_id, validated_data):
     """
@@ -35,7 +37,7 @@ def process_upload_components(client_id, validated_data):
     """
     results = {}
     
-    # Process client info if provided (unchanged)
+    # Process client info if provided
     if validated_data.client_info:
         results['client'] = _process_client_info(validated_data.client_info)
     
@@ -43,7 +45,7 @@ def process_upload_components(client_id, validated_data):
     if validated_data.games:
         results['games'] = _process_standardized_games(client_id, validated_data.games)
     
-    # Process files if provided (unchanged for now)
+    # Process files if provided
     if validated_data.files:
         results['files'] = _process_files_data(client_id, validated_data.files)
     
@@ -65,6 +67,7 @@ def process_games_upload(client_id, games_data):
     
     try:
         uploaded_count = 0
+        skipped_count = 0
         
         with connection.get_connection() as conn:
             cursor = conn.cursor()
@@ -79,6 +82,7 @@ def process_games_upload(client_id, games_data):
                     cursor.execute(existing_query, (game_id,))
                     
                     if cursor.fetchone():
+                        skipped_count += 1
                         continue  # Skip duplicate
                     
                     # Insert new game
@@ -101,15 +105,9 @@ def process_games_upload(client_id, games_data):
             
             conn.commit()
         
-        # Update client last active
-        with connection.get_connection() as conn:
-            cursor = conn.cursor()
-            update_query = mgr.get_query('clients', 'update_last_active')
-            cursor.execute(update_query, (datetime.now().isoformat(), client_id))
-            conn.commit()
-        
         return {
             'uploaded_count': uploaded_count,
+            'skipped_count': skipped_count,
             'total_submitted': len(games_data),
             'status': 'success'
         }
@@ -117,7 +115,6 @@ def process_games_upload(client_id, games_data):
         logger.error(f"Error uploading games for client {client_id}: {str(e)}")
         return {'error': str(e)}
 
-# NEW: Add the file upload logic from api_service.py
 def process_file_upload_logic(client_id, file_info, file_content):
     """
     Process file upload logic - moved from api_service.py
@@ -136,20 +133,22 @@ def process_file_upload_logic(client_id, file_info, file_content):
         filename = file_info.get('filename', 'unknown')
         
         # Check if file with same hash already exists
-        existing = execute_query('files', 'select_by_hash', (file_hash,), fetch_one=True)
-        
-        if existing:
-            return {
-                'file_id': existing['file_id'],
-                'status': 'duplicate',
-                'message': 'File already exists'
-            }
-        
-        # Store file metadata
         with connection.get_connection() as conn:
             cursor = conn.cursor()
-            query = mgr.get_query('files', 'insert_file')
-            cursor.execute(query, (
+            check_query = mgr.get_query('files', 'select_by_hash')
+            cursor.execute(check_query, (file_hash,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                return {
+                    'file_id': existing['file_id'],
+                    'status': 'duplicate',
+                    'message': 'File already exists'
+                }
+            
+            # Store file metadata
+            insert_query = mgr.get_query('files', 'insert_file')
+            cursor.execute(insert_query, (
                 file_id,
                 client_id,
                 filename,
@@ -168,6 +167,31 @@ def process_file_upload_logic(client_id, file_info, file_content):
         logger.error(f"Error processing file upload: {str(e)}")
         return {'error': str(e)}
 
+def handle_upload_side_effects(client_id, upload_results):
+    """
+    Handle side effects like activity tracking and notifications.
+    
+    Args:
+        client_id (str): Client identifier
+        upload_results (dict): Results from upload processing
+    """
+    try:
+        # Update client last activity if any processing was successful
+        if _has_successful_uploads(upload_results):
+            _update_client_activity(client_id)
+        
+        # Could add other side effects like:
+        # - Analytics tracking
+        # - Notification sending  
+        # - Background processing triggers
+        
+    except Exception as e:
+        # Side effects shouldn't fail the main upload
+        logger.warning(f"Upload side effects failed for client {client_id}: {str(e)}")
+
+# ============================================================================
+# Helper Functions - Private Implementation Details
+# ============================================================================
 
 def _process_standardized_games(client_id: str, games: List[UploadGameData]) -> dict:
     """
@@ -206,77 +230,113 @@ def _process_standardized_games(client_id: str, games: List[UploadGameData]) -> 
                         game.start_time,
                         game.stage_id,
                         game.game_length_frames,
-                        json.dumps([p.to_dict() for p in game.players]),
-                        json.dumps({
-                            'game_id': game.game_id,
-                            'start_time': game.start_time,
-                            'stage_id': game.stage_id,
-                            'stage_name': game.stage_name,
-                            'game_length_frames': game.game_length_frames,
-                            'game_length_seconds': game.game_length_seconds,
-                            'game_type': game.game_type,
-                            'player_data': [p.to_dict() for p in game.players],
-                            'metadata': game.metadata
-                        })
+                        json.dumps([player.to_dict() for player in game.player_data]),
+                        json.dumps(game.to_dict())  # full_data with all standardized fields
                     ))
                     
                     uploaded_count += 1
                     
                 except Exception as e:
-                    processing_errors.append(f"Game {game.game_id}: {str(e)}")
+                    logger.warning(f"Error processing game {game.game_id}: {str(e)}")
+                    processing_errors.append(str(e))
                     continue
             
             conn.commit()
         
-        # Update client last activity
-        _update_client_activity(client_id)
-        
         return {
-            'success': uploaded_count > 0,
-            'games_processed': uploaded_count,
-            'games_skipped': skipped_count,
+            'uploaded_count': uploaded_count,
+            'skipped_count': skipped_count,
             'total_submitted': len(games),
-            'processing_errors': processing_errors
+            'processing_errors': processing_errors,
+            'status': 'success'
         }
         
     except Exception as e:
-        logger.error(f"Error processing games for client {client_id}: {str(e)}")
+        logger.error(f"Error processing standardized games for {client_id}: {str(e)}")
+        return {'error': str(e)}
+
+def _process_client_info(client_info: Dict[str, Any]) -> dict:
+    """
+    Process client information updates.
+    
+    Args:
+        client_info (dict): Client information to update
+    
+    Returns:
+        dict: Processing result
+    """
+    try:
+        # Import register_or_update_client from api_service
+        from backend.services.api_service import register_or_update_client
+        
+        result = register_or_update_client(client_info)
         return {
-            'success': False,
-            'error': str(e),
-            'games_processed': 0,
-            'games_skipped': 0,
-            'total_submitted': len(games)
+            'status': 'processed',
+            'result': result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing client info: {str(e)}")
+        return {
+            'status': 'error',
+            'error': str(e)
         }
 
-def _process_client_info(client_info):
-    """Process client information update."""
+def _process_files_data(client_id: str, files_data: List[Dict[str, Any]]) -> dict:
+    """
+    Process files data.
+    
+    Args:
+        client_id (str): Client identifier
+        files_data (list): List of file data to process
+    
+    Returns:
+        dict: Processing results
+    """
     try:
-        return register_or_update_client(client_info)
-    except Exception as e:
-        logger.warning(f"Client info processing failed: {str(e)}")
-        return {'success': False, 'error': str(e)}
-
-def _process_files_data(client_id, files_data):
-    """Process files data upload."""
-    try:
-        processed_files = []
+        uploaded_count = 0
+        duplicate_count = 0
+        error_count = 0
+        file_results = []
+        
         for file_data in files_data:
-            processed_files.append({
-                'filename': file_data.get('filename', 'unknown'),
-                'status': 'processed'
-            })
+            try:
+                # Extract file content if present (this is simplified)
+                file_content = file_data.get('content', b'')
+                file_info = {
+                    'filename': file_data.get('filename', 'unknown'),
+                    'hash': file_data.get('hash', 'unknown')
+                }
+                
+                result = process_file_upload_logic(client_id, file_info, file_content)
+                file_results.append(result)
+                
+                if result.get('status') == 'uploaded':
+                    uploaded_count += 1
+                elif result.get('status') == 'duplicate':
+                    duplicate_count += 1
+                elif 'error' in result:
+                    error_count += 1
+                    
+            except Exception as e:
+                logger.warning(f"Error processing file: {str(e)}")
+                error_count += 1
+                file_results.append({'error': str(e)})
         
         return {
-            'success': True,
-            'files_processed': len(processed_files),
-            'files': processed_files
+            'uploaded_count': uploaded_count,
+            'duplicate_count': duplicate_count,
+            'error_count': error_count,
+            'total_submitted': len(files_data),
+            'file_results': file_results,
+            'status': 'success'
         }
+        
     except Exception as e:
-        logger.warning(f"Files data processing failed: {str(e)}")
-        return {'success': False, 'error': str(e)}
+        logger.error(f"Error processing files for {client_id}: {str(e)}")
+        return {'error': str(e)}
 
-def _update_client_activity(client_id):
+def _update_client_activity(client_id: str):
     """Update client last activity timestamp."""
     try:
         with connection.get_connection() as conn:
@@ -288,31 +348,13 @@ def _update_client_activity(client_id):
         logger.error(f"Failed to update client activity for {client_id}: {str(e)}")
         raise
 
-def handle_upload_side_effects(client_id, upload_results):
-    """
-    Handle side effects like activity tracking and notifications.
-    
-    Args:
-        client_id (str): Client identifier
-        upload_results (dict): Results from upload processing
-    """
-    try:
-        # Update client last activity if any processing was successful
-        if _has_successful_uploads(upload_results):
-            _update_client_activity(client_id)
-        
-        # Could add other side effects like:
-        # - Analytics tracking
-        # - Notification sending  
-        # - Background processing triggers
-        
-    except Exception as e:
-        # Side effects shouldn't fail the main upload
-        logger.warning(f"Upload side effects failed for client {client_id}: {str(e)}")
-
-def _has_successful_uploads(upload_results):
+def _has_successful_uploads(upload_results: Dict[str, Any]) -> bool:
     """Check if any upload components were successful."""
     for component_result in upload_results.values():
-        if isinstance(component_result, dict) and component_result.get('success', True):
-            return True
+        if isinstance(component_result, dict):
+            # Check for successful uploads in the result
+            if (component_result.get('uploaded_count', 0) > 0 or 
+                component_result.get('status') == 'success' or
+                component_result.get('status') == 'processed'):
+                return True
     return False
