@@ -54,7 +54,7 @@ def player_profile(encoded_player_code):
     try:
         player_code = decode_player_tag(encoded_player_code)
         context_data = web_service.process_player_profile_request(player_code)
-        return render_template('pages/player/player.html', **context_data)
+        return render_template('pages/player_basic/player_basic.html', **context_data)
     except ValueError:
         return render_template('pages/error_status/error_status.html',
                               status_code=400,
@@ -80,7 +80,7 @@ def player_detailed(encoded_player_code):
         limit = int(request.args.get('limit', '100'))
         
         context_data = web_service.process_player_detailed_request(
-            player_code, character, opponent, stage, limit
+            player_code
         )
         return render_template('pages/player_detailed/player_detailed.html', **context_data)
     except ValueError:
