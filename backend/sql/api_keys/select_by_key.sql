@@ -1,0 +1,1 @@
+SELECT * FROM api_keys WHERE api_key = ?

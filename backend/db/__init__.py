@@ -46,7 +46,9 @@ def rows_to_dicts(rows):
 
 def execute_query(category, query_name, params=None, fetch_one=False):
     """
-    Standard database query execution with consistent error handling.
+    Standard database query execution with consistent error handling and transaction management.
+    
+    FIXED: Now properly commits INSERT/UPDATE/DELETE operations
     
     Args:
         category (str): SQL category (e.g., 'games')
@@ -56,6 +58,7 @@ def execute_query(category, query_name, params=None, fetch_one=False):
     
     Returns:
         Clean dictionary or list of dictionaries (never sqlite3.Row objects)
+        For INSERT/UPDATE/DELETE: returns number of affected rows
         
     Raises:
         Exception: Database errors bubble up to service layer
@@ -69,12 +72,27 @@ def execute_query(category, query_name, params=None, fetch_one=False):
         else:
             cursor.execute(query)
         
-        if fetch_one:
-            result = cursor.fetchone()
-            return row_to_dict(result)
+        # FIXED: Determine if this is a data modification query
+        query_lower = query.strip().lower()
+        is_modification = (
+            query_lower.startswith('insert') or 
+            query_lower.startswith('update') or 
+            query_lower.startswith('delete') or
+            query_lower.startswith('replace')
+        )
+        
+        if is_modification:
+            # FIXED: Commit the transaction for data modifications
+            conn.commit()
+            return cursor.rowcount  # Return number of affected rows
         else:
-            results = cursor.fetchall()
-            return rows_to_dicts(results)
+            # For SELECT queries, fetch and return results
+            if fetch_one:
+                result = cursor.fetchone()
+                return row_to_dict(result)
+            else:
+                results = cursor.fetchall()
+                return rows_to_dicts(results)
 
 
 def execute_query_raw(category, query_name, params=None):

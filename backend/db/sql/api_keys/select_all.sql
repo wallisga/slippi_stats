@@ -1,1 +1,1 @@
-SELECT * FROM {api_keys_table}
+SELECT * FROM api_keys

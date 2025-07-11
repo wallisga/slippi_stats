@@ -2,26 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Current State] - December 2024
+## [Current State] - July 2025
 
 ### 🎯 **Major Architecture Achievement**
 **Successful migration from monolithic to service-oriented architecture with zero downtime**
 
+### 🔧 **URGENT: Client Registration Issues - FIXING**
+- **Problem**: Client registration failing with 500 error "processing_error"
+- **Root Cause**: SQL Manager import conflicts in client service processors
+- **Impact**: New client registrations completely broken
+- **Status**: 🚨 **IN PROGRESS** - Fixing SQL layer integration
+
 ### ✅ **Current Working Features**
 - **Player Analytics**: Basic & detailed player statistics with advanced filtering
-- **Data Upload**: Client registration and game/file upload system
 - **Web Interface**: Responsive UI with character icons and interactive charts
-- **API Layer**: RESTful API with authentication and rate limiting
+- **API Layer**: RESTful API with authentication and rate limiting (when clients can register)
 - **Database**: SQLite with external SQL file management
 - **Frontend**: Component-based architecture with progressive enhancement
 - **Observability**: OpenTelemetry tracing and Prometheus metrics
-
-### 🔧 **Recent Critical Fixes**
-- **Frontend Filtering**: Fixed character data structure access in API service
-- **POST API Endpoint**: Added missing POST route for detailed player filtering
-- **Template Errors**: Fixed missing `error_type` variables in error handlers
-- **Client Domain**: Implemented complete client registration and API key management
-- **Upload Domain**: Added schema validation and file processing capabilities
 
 ### 🏗️ **Current Architecture**
 
@@ -65,198 +63,133 @@ Components (components/)                      ← Self-contained UI behavior
 
 ## [Recent Changes] - Chat Session History
 
+### **Chat Session: Client Registration Debug Session**
+**Status**: 🎯 **SOLUTION FOUND** - Root cause identified and fix ready
+
+#### **Issues Identified & Status**
+1. ✅ **SQL Manager Import Conflicts**: FIXED - Client processors now use standardized `backend.db` layer
+2. ✅ **Database Layer Inconsistency**: FIXED - All processors use `backend.db.execute_query()`
+3. ✅ **SQL Template Issues**: FIXED - API keys SQL files no longer use problematic placeholders
+4. 🎯 **Transaction Commit Issue**: IDENTIFIED - `execute_query` doesn't commit INSERT operations
+
+#### **Final Diagnostic Results**
+```
+✅ Database connection successful
+✅ Service imports successful  
+✅ All required SQL files found (no template issues)
+✅ All required tables found
+✅ Table schemas correct
+✅ Raw database operations work perfectly
+✅ Client insert via execute_query successful
+❌ Client select via execute_query failed - no result
+```
+
+#### **Root Cause: Transaction Commit Problem**
+**Issue**: The `execute_query` function successfully executes INSERT statements but doesn't commit the transaction, so subsequent SELECT operations can't see the inserted data.
+
+**Evidence**: 
+- Raw database operations work (manual commit)
+- `execute_query` INSERT works but data isn't committed
+- `execute_query` SELECT fails because data wasn't persisted
+
+#### **Solution: Fixed execute_query Function**
+**Problem**: Original `execute_query` function doesn't distinguish between SELECT and INSERT operations for transaction handling.
+
+**Fix**: Updated `execute_query` to:
+1. **Detect modification queries** (INSERT, UPDATE, DELETE, REPLACE)
+2. **Automatically commit** data modification operations  
+3. **Return row count** for modifications, **data results** for selects
+
+#### **Files to Update**
+1. ✅ **`backend/services/client/processors.py`** - ALREADY FIXED
+2. 🎯 **`backend/db/__init__.py`** - NEEDS UPDATED `execute_query` function  
+3. ✅ **API Keys SQL files** - ALREADY FIXED (no templates)
+
+#### **Next Steps - Final Fix**
+1. **Replace execute_query function** in `backend/db/__init__.py` with the fixed version
+2. **Run transaction test script** to verify the fix works
+3. **Test client registration endpoint** - should now work correctly
+4. **Verify end-to-end flow** from client app to successful API key generation
+
 ### **Chat Session: Template & Filtering Fixes**
 **Status**: ✅ **COMPLETED & WORKING**
 
 #### **Issues Identified**
 1. **Frontend Filter Broken**: Character names showing as "Unknown"
 2. **Template Errors**: Missing `error_type` variables causing JSON errors  
-3. **API Mismatch**: Frontend POST requests failing (no POST endpoint)
-4. **Function Calls**: Missing helper functions in api_service.py
+3. **POST API Missing**: Detailed player filtering needs POST endpoint support
 
-#### **Solutions Implemented**
-1. **Data Structure Fix**: Corrected character access from root level to nested structure
+#### **Fixes Applied**
+1. **Fixed Character Data Access**: Updated filtering functions to use correct game data structure
    ```python
-   # Before (broken)
-   char = game.get('character_name', 'Unknown')
+   # BEFORE (broken)
+   character = game.get('character_name', 'Unknown')
    
-   # After (working)  
-   char = game.get('player', {}).get('character_name', 'Unknown')
+   # AFTER (working)
+   character = game.get('player_data', [{}])[0].get('character_name', 'Unknown')
    ```
 
-2. **Added POST API Endpoint**: Support both GET and POST for player detailed stats
+2. **Added Missing Template Variables**: Fixed all error handlers to include required `error_type`
+   ```python
+   # Added to all error returns
+   return render_template('pages/error_status/error_status.html',
+                         status_code=500, error_type="danger")
+   ```
+
+3. **Added POST Support**: Enhanced detailed player API to support POST filtering
    ```python
    @api_bp.route('/player/<encoded_player_code>/detailed', methods=['GET', 'POST'])
    ```
 
-3. **Template Error Fix**: Added `error_type` parameter to all error handlers
-   ```python
-   return render_template('pages/error_status/error_status.html',
-                         error_type="danger", ...)
-   ```
+#### **Testing Results**
+- ✅ Character filtering now works correctly
+- ✅ Error pages render without JSON errors
+- ✅ Advanced filtering supports both GET and POST
+- ✅ Frontend JavaScript successfully updates charts and tables
 
-4. **Missing Functions**: Added helper functions to api_service.py
-   - `_get_player_games_for_analysis()`
-   - `_calculate_comprehensive_analysis()`
-   - `filter_matches()`
-   - `extract_filter_options()`
-   - `calculate_filtered_stats()`
+### **Previous Sessions: Major Architecture Migration**
+**Status**: ✅ **COMPLETED**
 
-#### **Results**
-- ✅ Frontend filtering now works correctly
-- ✅ Character names display properly (Fox, Falco, etc.)
-- ✅ Opponent and opponent character filtering functional
-- ✅ Template errors eliminated
-- ✅ API endpoints support both GET and POST methods
+#### **Completed Migration Work**
+1. **Service Layer Separation**: Split monolithic logic into focused services
+2. **Domain Services**: Created specialized client and upload domains
+3. **External SQL Management**: Moved all SQL to organized external files
+4. **Database Layer Redesign**: Clean separation between business logic and data access
+5. **Component-Based Frontend**: Separated UI into reusable components
+6. **Observability Integration**: Added tracing and metrics throughout
 
-### **Chat Session: Client Domain Implementation**
-**Status**: ✅ **COMPLETED** (needs production testing)
-
-#### **Original Issue**
-- `write() argument must be str, not None` error in API key generation
-- Client registration failing due to None values being written to files
-
-#### **Solution: Complete Client Domain Service**
-- Created `backend/services/client/` domain with full structure
-- Implemented proper API key generation and file management  
-- Added validation, schemas, and error handling
-- Migrated from old `register_or_update_client()` to domain pattern
-
-#### **Files Created**
-- `client/schemas.py` - Data structures for client management
-- `client/validation.py` - Client data validation logic
-- `client/service.py` - Main orchestrator functions
-- `client/processors.py` - Core business logic and database operations
-
-### **Chat Session: Upload Domain Migration**
-**Status**: ✅ **COMPLETED** 
-
-#### **Achievement**
-- Migrated upload logic from monolithic api_service.py to domain service
-- Implemented standardized schemas to eliminate data format confusion
-- Added comprehensive validation and error handling
-
-#### **Benefits Achieved**
-- **Eliminated result vs placement confusion** through standardized schemas
-- **Computed display fields** automatically available in templates
-- **Type safety** with clear data contracts and validation
-- **Consistent error handling** with structured validation messages
+#### **Quality Improvements**
+- **Error Handling**: Consistent error responses across all layers
+- **Code Organization**: Clear separation of concerns
+- **Maintainability**: External SQL files for easy query updates
+- **Testing**: Service layer contract tests and database integration tests
+- **Documentation**: Comprehensive README files for each component
 
 ---
 
-## [Historical Migration] - Major Architectural Evolution
+## [Technical Debt & Future Work]
 
-### **Phase 1: Foundation** ✅ **COMPLETED**
-- **External SQL Migration**: Moved all SQL queries to organized external files
-- **Service Layer Extraction**: Created web_service.py and api_service.py
-- **Database Layer**: Implemented clean data access layer
-- **Configuration**: Centralized configuration management
+### **High Priority** 🔴
+1. **Fix Client Registration**: URGENT - Complete failure of new client onboarding
+2. **Rate Limiting**: Implement proper rate limiting for all API endpoints
+3. **Security Audit**: Review API key management and client authentication
+4. **Database Migration**: Plan PostgreSQL migration for production scaling
 
-### **Phase 2: Frontend Architecture** ✅ **COMPLETED**  
-- **Component System**: Self-contained UI components with auto-initialization
-- **Layout Architecture**: Component orchestration and page structure
-- **Progressive Enhancement**: Core functionality works without JavaScript
-- **Asset Management**: Components manage their own CSS/JS
+### **Medium Priority** 🟡
+1. **Test Coverage**: Increase from 51% to 75% target
+2. **Performance Optimization**: Database indexing and query optimization
+3. **Error Monitoring**: Better error tracking and alerting
+4. **API Documentation**: OpenAPI/Swagger documentation
 
-### **Phase 3: Testing Framework** ✅ **COMPLETED**
-- **Service Layer Tests**: Fast contract tests for business logic
-- **Integration Tests**: Database and HTTP endpoint validation
-- **Architecture Alignment**: Tests respect module boundaries
-- **Coverage Goals**: 51% current, targeting 75%
-
-### **Phase 4: Observability** ✅ **COMPLETED**
-- **OpenTelemetry**: Distributed tracing across all layers
-- **Prometheus Metrics**: Business and performance monitoring
-- **Grafana Dashboards**: Operational insights and alerting
-- **Development Stack**: Local observability with Docker
-
-### **Phase 5: Domain Services** 🔄 **IN PROGRESS**
-- ✅ Upload domain (complete with schemas)
-- ✅ Client domain (complete with API key management)
-- 🔄 Player domain (candidate for future migration)
-- 🔄 Stats domain (candidate for future migration)
-
----
-
-## [Architecture Decisions] - Key Design Choices
-
-### **Service-Oriented Architecture**
-- **Decision**: Migrate from single file to service-oriented architecture
-- **Rationale**: Enable maintainability, testability, and clear boundaries
-- **Result**: 92% reduction in main app file size, clear module responsibilities
-
-### **External SQL Management**
-- **Decision**: Move all SQL queries to external, organized files
-- **Rationale**: Version control, readability, and hot reloading capability  
-- **Result**: 50+ queries externalized, improved developer productivity
-
-### **Domain Services Pattern**
-- **Decision**: Implement domain services for complex business areas
-- **Rationale**: Standardized schemas eliminate data format inconsistencies
-- **Result**: Upload and client domains successfully implemented
-
-### **Component-Based Frontend**
-- **Decision**: Self-contained components with progressive enhancement
-- **Rationale**: Reusability, maintainability, and clear separation of concerns
-- **Result**: Modular UI architecture with auto-initialization
-
-### **Testing as Architecture Enforcement**
-- **Decision**: Align test categories with architectural boundaries
-- **Rationale**: Tests should validate contracts, not implementation details
-- **Result**: Fast service layer tests, comprehensive integration coverage
-
----
-
-## [Future Roadmap] - Planned Improvements
-
-### **Immediate (Next Sprint)**
-- [ ] **Documentation Consolidation**: Simplify and organize current docs
-- [ ] **Production Testing**: Validate client and upload services in production
-- [ ] **Performance Monitoring**: Add query performance tracking
-- [ ] **Error Handling**: Standardize error responses across all APIs
-
-### **Short Term (1-2 Months)**
-- [ ] **Player Domain Migration**: Move player functions to domain service
-- [ ] **API Response Standardization**: Use schemas for all API responses  
-- [ ] **Database Optimization**: Add connection pooling and query caching
-- [ ] **Frontend Enhancements**: Advanced filtering UI and real-time updates
-
-### **Long Term (3-6 Months)**
-- [ ] **Microservice Readiness**: Prepare for potential service extraction
-- [ ] **Advanced Analytics**: Machine learning pipelines for player insights
-- [ ] **Real-time Features**: WebSocket support for live updates
-- [ ] **Scaling Preparation**: Redis caching and database read replicas
-
----
-
-## [Development Context] - For Future Conversations
-
-### **Current Development Pattern**
-- **Architecture**: Service-oriented backend, component-based frontend
-- **Testing**: Contract-focused with architectural alignment
-- **SQL**: External files with hot reloading and template support
-- **Deployment**: Single server with observability stack
-
-### **Active Development Areas**
-- **Domain Services**: Migrating complex business logic to domain pattern
-- **Frontend Filtering**: Advanced player analysis with real-time updates
-- **Performance**: Query optimization and caching strategies
-- **Documentation**: Consolidation and standardization
-
-### **Known Technical Debt**
-- **Mixed Service Patterns**: Both monolithic and domain services coexist
-- **API Response Formats**: Some endpoints lack standardized response schemas
-- **Database Layer**: No connection pooling or query result caching
-- **Frontend**: Some components could be more modular
-
-### **Contributing Guidelines**
-- **Backend**: Follow service layer patterns and external SQL organization
-- **Frontend**: Use component-based architecture with progressive enhancement
-- **Testing**: Add tests that align with architectural boundaries
-- **Documentation**: Update relevant docs when making architectural changes
+### **Low Priority** 🟢
+1. **Frontend Enhancements**: Advanced filtering UI improvements
+2. **Analytics Features**: More detailed player statistics
+3. **File Management**: Better file organization and cleanup
+4. **Monitoring Dashboard**: Admin interface for server monitoring
 
 ---
 
 **Maintained by**: Gavin  
-**Last Updated**: July 2025  
-**Next Review**: After production client/upload testing
+**Last Updated**: July 10, 2025  
+**Version**: Client registration debugging session  
+**Next Session Goal**: Fix client registration 500 errors and restore client onboarding

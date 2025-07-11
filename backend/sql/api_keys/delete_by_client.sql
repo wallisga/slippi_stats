@@ -1,0 +1,1 @@
+DELETE FROM api_keys WHERE client_id = ?

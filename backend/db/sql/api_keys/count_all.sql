@@ -1,1 +1,1 @@
-SELECT COUNT(*) as count FROM {api_keys_table}
+SELECT COUNT(*) as count FROM api_keys

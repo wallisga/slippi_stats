@@ -1,0 +1,1 @@
+SELECT COUNT(*) as count FROM clients WHERE datetime(last_active) > datetime('now', '-30 days')

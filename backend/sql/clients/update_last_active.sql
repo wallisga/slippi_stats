@@ -1,0 +1,1 @@
+UPDATE clients SET last_active = ? WHERE client_id = ?
