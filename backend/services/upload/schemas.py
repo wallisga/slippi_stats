@@ -1,8 +1,8 @@
 """
 Upload Domain Schemas
 
-Data definitions and structures for upload processing.
 Pure data structures only - no business logic or validation.
+FIXED: Removed all @classmethod violations per architecture.
 """
 
 import uuid
@@ -46,7 +46,7 @@ class GameResult(Enum):
             return cls.NO_CONTEST
 
 # ============================================================================
-# Data Structures
+# Pure Data Structures
 # ============================================================================
 
 @dataclass
@@ -59,28 +59,6 @@ class PlayerUploadData:
     
     # Raw data for backward compatibility
     raw_data: Dict[str, Any] = field(default_factory=dict)
-    
-    @classmethod
-    def from_upload_data(cls, raw_player: Dict[str, Any]) -> 'PlayerUploadData':
-        """Create from raw upload data."""
-        player_tag = raw_player.get('player_tag', '')
-        character_name = raw_player.get('character_name', 'Unknown')
-        placement = int(raw_player.get('placement', 0))
-        
-        # Determine result from multiple possible fields
-        result = GameResult.NO_CONTEST
-        if 'result' in raw_player:
-            result = GameResult.from_string(raw_player['result'])
-        elif placement > 0:
-            result = GameResult.from_placement(placement)
-        
-        return cls(
-            player_tag=player_tag,
-            character_name=character_name,
-            placement=placement,
-            result=result,
-            raw_data=raw_player
-        )
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage."""
@@ -109,39 +87,6 @@ class UploadGameData:
     # Raw data for backward compatibility
     raw_data: Dict[str, Any] = field(default_factory=dict)
     
-    @classmethod
-    def from_upload_data(cls, raw_game: Dict[str, Any], client_id: str) -> 'UploadGameData':
-        """Create from raw upload data."""
-        # Generate game ID if not provided
-        game_id = raw_game.get('game_id', str(uuid.uuid4()))
-        
-        # Extract basic fields
-        stage_id = int(raw_game.get('stage_id', 0))
-        start_time = raw_game.get('start_time', datetime.now().isoformat())
-        game_length_frames = int(raw_game.get('game_length_frames', 0))
-        
-        # Process player data
-        player_data = []
-        for raw_player in raw_game.get('player_data', []):
-            player = PlayerUploadData.from_upload_data(raw_player)
-            player_data.append(player)
-        
-        # Compute derived fields
-        stage_name = _get_stage_name(stage_id)
-        game_length_seconds = game_length_frames / 60.0 if game_length_frames > 0 else 0.0
-        
-        return cls(
-            game_id=game_id,
-            client_id=client_id,
-            stage_id=stage_id,
-            start_time=start_time,
-            game_length_frames=game_length_frames,
-            player_data=player_data,
-            stage_name=stage_name,
-            game_length_seconds=game_length_seconds,
-            raw_data=raw_game
-        )
-    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage."""
         return {
@@ -165,28 +110,6 @@ class CombinedUploadData:
     files: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     upload_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    
-    @classmethod
-    def from_upload_request(cls, client_id: str, raw_upload: Dict[str, Any]) -> 'CombinedUploadData':
-        """Create from raw upload request."""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        games = []
-        for raw_game in raw_upload.get('games', []):
-            try:
-                game_data = UploadGameData.from_upload_data(raw_game, client_id)
-                games.append(game_data)
-            except Exception as e:
-                logger.warning(f"Skipping invalid game data: {str(e)}")
-        
-        return cls(
-            client_id=client_id,
-            client_info=raw_upload.get('client_info'),
-            games=games,
-            files=raw_upload.get('files', []),
-            metadata=raw_upload.get('metadata', {})
-        )
 
 # ============================================================================
 # Custom Exceptions (Data-Related)
@@ -195,20 +118,3 @@ class CombinedUploadData:
 class UploadValidationError(Exception):
     """Exception raised when upload validation fails."""
     pass
-
-# ============================================================================
-# Helper Functions (Data Processing Only)
-# ============================================================================
-
-def _get_stage_name(stage_id: int) -> Optional[str]:
-    """Get stage name from stage ID."""
-    # Stage ID to name mapping
-    stage_names = {
-        2: "Fountain of Dreams",
-        3: "Pokemon Stadium",
-        8: "Yoshi's Story",
-        28: "Dream Land N64",
-        31: "Battlefield",
-        32: "Final Destination"
-    }
-    return stage_names.get(stage_id, f"Unknown Stage ({stage_id})")

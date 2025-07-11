@@ -1,24 +1,124 @@
 """
 Client Domain Processing Logic
 
-Core business logic operations for client management.
-Handles client registration, API keys, updates, and data access.
-
-FIXED: Updated to use standardized backend.db layer instead of direct SQL manager imports
+FIXED: Added database construction methods that belong in processors, not schemas.
+All database-related construction logic now properly placed in processors.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+import secrets
+import hashlib
 from backend.config import get_config
-from backend.db import execute_query  # FIXED: Use standardized db layer
-from .schemas import ClientRegistrationData, ApiKeyData, ClientInfo, ClientStatus
+from backend.db import execute_query
+from .schemas import ClientRegistrationData, ApiKeyData, ClientInfo, ClientStatus, PlatformType
 
 # Configuration
 config = get_config()
 logger = config.init_logging()
 
-# REMOVED: Direct SQL manager import - now using backend.db.execute_query()
+# ============================================================================
+# Schema Construction Helpers (Database-Related Logic)
+# ============================================================================
+
+def create_client_registration_from_request(raw_data: Dict[str, Any]) -> ClientRegistrationData:
+    """
+    Create ClientRegistrationData from raw registration request data.
+    
+    FIXED: This database-related construction belongs in processors, not schemas.
+    """
+    client_id = raw_data.get('client_id')
+    if not client_id:
+        import uuid
+        client_id = str(uuid.uuid4())
+    
+    platform_str = raw_data.get('platform', 'unknown')
+    platform = PlatformType.from_string(platform_str)
+    
+    return ClientRegistrationData(
+        client_id=client_id,
+        hostname=raw_data.get('hostname', 'unknown'),
+        platform=platform,
+        version=raw_data.get('version', '1.0.0'),
+        registration_date=raw_data.get('registration_date', datetime.now().isoformat()),
+        user_agent=raw_data.get('user_agent'),
+        ip_address=raw_data.get('ip_address'),
+        additional_info={k: v for k, v in raw_data.items() 
+                       if k not in ['client_id', 'hostname', 'platform', 'version', 'registration_date']}
+    )
+
+def create_api_key_from_database_record(record: Dict[str, Any]) -> ApiKeyData:
+    """
+    Create ApiKeyData from database record.
+    
+    FIXED: This database-related construction belongs in processors, not schemas.
+    """
+    if not record:
+        raise ValueError("Cannot create ApiKeyData from empty record")
+        
+    return ApiKeyData(
+        client_id=record['client_id'],
+        api_key=record['api_key'],
+        created_at=record.get('created_at', datetime.now().isoformat()),
+        expires_at=record.get('expires_at'),
+        is_active=record.get('is_active', True),
+        last_used_at=record.get('last_used_at'),
+        usage_count=record.get('usage_count', 0)
+    )
+
+def create_new_api_key(client_id: str, expiry_days: int = 365) -> ApiKeyData:
+    """
+    Create a new API key with expiration.
+    
+    FIXED: This creation logic belongs in processors, not schemas.
+    """
+    # Generate secure API key
+    current_time = datetime.now().isoformat()
+    random_bytes = secrets.token_bytes(32)
+    api_key = hashlib.sha256(f"{client_id}:{current_time}:{random_bytes.hex()}".encode()).hexdigest()
+    
+    # Calculate expiration
+    expires_at = (datetime.now() + timedelta(days=expiry_days)).isoformat()
+    
+    return ApiKeyData(
+        client_id=client_id,
+        api_key=api_key,
+        created_at=current_time,
+        expires_at=expires_at,
+        is_active=True
+    )
+
+def create_client_info_from_database_records(client_record: Dict[str, Any], 
+                                           api_key_record: Optional[Dict[str, Any]] = None) -> ClientInfo:
+    """
+    Create ClientInfo from database records.
+    
+    FIXED: This database-related construction belongs in processors, not schemas.
+    """
+    # Create registration data
+    registration = ClientRegistrationData(
+        client_id=client_record['client_id'],
+        hostname=client_record.get('hostname', 'unknown'),
+        platform=PlatformType.from_string(client_record.get('platform', 'unknown')),
+        version=client_record.get('version', '1.0.0'),
+        registration_date=client_record.get('registration_date', datetime.now().isoformat())
+    )
+    
+    # Create API key data if available
+    api_key = None
+    if api_key_record:
+        api_key = create_api_key_from_database_record(api_key_record)
+    
+    return ClientInfo(
+        registration=registration,
+        api_key=api_key,
+        status=ClientStatus(client_record.get('status', 'active')),
+        total_uploads=client_record.get('total_uploads', 0),
+        total_games_uploaded=client_record.get('total_games_uploaded', 0),
+        total_files_uploaded=client_record.get('total_files_uploaded', 0),
+        last_activity=client_record.get('last_active')
+    )
 
 # ============================================================================
 # Client Registration Processing
@@ -37,7 +137,7 @@ def process_client_registration_data(registration_data: ClientRegistrationData) 
     client_id = registration_data.client_id
     
     try:
-        # Check if client already exists - FIXED: Use standardized execute_query
+        # Check if client already exists
         existing_client = execute_query('clients', 'select_by_id', (client_id,), fetch_one=True)
         
         if existing_client:
@@ -60,7 +160,6 @@ def process_client_registration_data(registration_data: ClientRegistrationData) 
 def _create_new_client(registration_data: ClientRegistrationData) -> Dict[str, Any]:
     """Create a new client record."""
     try:
-        # FIXED: Use standardized execute_query for insert operations
         execute_query('clients', 'insert_client', (
             registration_data.client_id,
             registration_data.hostname,
@@ -84,7 +183,6 @@ def _update_existing_client(registration_data: ClientRegistrationData,
                           existing_client: Dict[str, Any]) -> Dict[str, Any]:
     """Update an existing client record."""
     try:
-        # FIXED: Use standardized execute_query for update operations
         execute_query('clients', 'update_info', (
             registration_data.hostname,
             registration_data.platform.value,
@@ -122,11 +220,11 @@ def process_api_key_generation(client_id: str, force_new: bool = False) -> Dict[
     try:
         # Check for existing valid API key if not forcing new
         if not force_new:
-            # FIXED: Use standardized execute_query
             existing_api_key = execute_query('api_keys', 'select_by_client', (client_id,), fetch_one=True)
             
             if existing_api_key:
-                api_key_data = ApiKeyData.from_database_record(existing_api_key)
+                # FIXED: Use processor helper instead of schema method
+                api_key_data = create_api_key_from_database_record(existing_api_key)
                 if api_key_data.is_valid():
                     logger.info(f"Using existing valid API key for client {client_id}")
                     return {
@@ -137,10 +235,10 @@ def process_api_key_generation(client_id: str, force_new: bool = False) -> Dict[
                     }
         
         # Generate new API key
-        new_api_key_data = _generate_new_api_key(client_id)
+        # FIXED: Use processor helper instead of schema method
+        new_api_key_data = create_new_api_key(client_id, config.TOKEN_EXPIRY_DAYS)
         
         # Store API key in database
-        # FIXED: Use standardized execute_query
         execute_query('api_keys', 'insert_key', (
             new_api_key_data.client_id,
             new_api_key_data.api_key,
@@ -161,22 +259,6 @@ def process_api_key_generation(client_id: str, force_new: bool = False) -> Dict[
         logger.error(f"Error processing API key generation for {client_id}: {str(e)}")
         raise
 
-def _generate_new_api_key(client_id: str) -> ApiKeyData:
-    """Generate new API key data."""
-    import uuid
-    from datetime import timedelta
-    
-    api_key = f"slippi_api_{uuid.uuid4().hex}"
-    created_at = datetime.now().isoformat()
-    expires_at = (datetime.now() + timedelta(days=config.TOKEN_EXPIRY_DAYS)).isoformat()
-    
-    return ApiKeyData(
-        client_id=client_id,
-        api_key=api_key,
-        created_at=created_at,
-        expires_at=expires_at
-    )
-
 def validate_existing_api_key(api_key: str) -> Optional[ApiKeyData]:
     """
     Validate an existing API key.
@@ -188,13 +270,13 @@ def validate_existing_api_key(api_key: str) -> Optional[ApiKeyData]:
         ApiKeyData if valid, None otherwise
     """
     try:
-        # FIXED: Use standardized execute_query
         api_key_record = execute_query('api_keys', 'select_by_key', (api_key,), fetch_one=True)
         
         if not api_key_record:
             return None
         
-        api_key_data = ApiKeyData.from_database_record(api_key_record)
+        # FIXED: Use processor helper instead of schema method
+        api_key_data = create_api_key_from_database_record(api_key_record)
         
         if not api_key_data.is_valid():
             logger.warning(f"Invalid or expired API key used: {api_key[:10]}...")
@@ -202,14 +284,9 @@ def validate_existing_api_key(api_key: str) -> Optional[ApiKeyData]:
         
         # Update usage tracking (non-critical)
         try:
-            # Note: We don't have update_usage.sql yet, and usage tracking is non-critical
-            # For now, we'll skip this feature to avoid inline SQL
-            # TODO: Create api_keys/update_usage.sql if usage tracking is needed
             logger.debug(f"API key usage tracking skipped for {api_key_data.client_id} (no SQL file)")
-            
         except Exception as e:
             logger.warning(f"Failed to update API key usage for {api_key_data.client_id}: {str(e)}")
-            # Don't raise - usage tracking is non-critical
         
         return api_key_data
         
@@ -228,7 +305,6 @@ def get_client_information(client_id: str) -> Optional[Dict[str, Any]]:
         dict: Complete client information or None if not found
     """
     try:
-        # FIXED: Use standardized execute_query
         client_record = execute_query('clients', 'select_by_id', (client_id,), fetch_one=True)
         
         if not client_record:
@@ -237,8 +313,8 @@ def get_client_information(client_id: str) -> Optional[Dict[str, Any]]:
         # Get API key record
         api_key_record = execute_query('api_keys', 'select_by_client', (client_id,), fetch_one=True)
         
-        # Create client info object
-        client_info = ClientInfo.from_database_records(client_record, api_key_record)
+        # FIXED: Use processor helper instead of schema method
+        client_info = create_client_info_from_database_records(client_record, api_key_record)
         
         return {
             'client_id': client_info.registration.client_id,
@@ -259,7 +335,7 @@ def get_client_information(client_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 # ============================================================================
-# Client Updates
+# Client Updates  
 # ============================================================================
 
 def process_client_update(client_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -274,13 +350,11 @@ def process_client_update(client_id: str, update_data: Dict[str, Any]) -> Dict[s
         dict: Update result
     """
     try:
-        # Check if client exists
         existing_client = execute_query('clients', 'select_by_id', (client_id,), fetch_one=True)
         
         if not existing_client:
             raise ValueError(f"Client {client_id} not found")
         
-        # Use the existing update_info.sql file
         # Build parameters in the order expected by the SQL file
         updated_fields = []
         
@@ -295,7 +369,6 @@ def process_client_update(client_id: str, update_data: Dict[str, Any]) -> Dict[s
         if 'version' in update_data:
             updated_fields.append('version')
         
-        # FIXED: Use standardized execute_query
         execute_query('clients', 'update_info', (
             hostname,
             platform,
@@ -320,15 +393,8 @@ def process_client_update(client_id: str, update_data: Dict[str, Any]) -> Dict[s
 # ============================================================================
 
 def update_client_activity(client_id: str, activity_type: str = 'general') -> None:
-    """
-    Update client last activity timestamp.
-    
-    Args:
-        client_id: Client identifier
-        activity_type: Type of activity (for future analytics)
-    """
+    """Update client last activity timestamp."""
     try:
-        # FIXED: Use standardized execute_query
         execute_query('clients', 'update_last_active', (
             datetime.now().isoformat(),
             client_id
@@ -338,12 +404,10 @@ def update_client_activity(client_id: str, activity_type: str = 'general') -> No
         
     except Exception as e:
         logger.warning(f"Failed to update activity for client {client_id}: {str(e)}")
-        # Don't raise - activity tracking is non-critical
 
 def get_client_statistics() -> Dict[str, Any]:
     """Get overall client statistics."""
     try:
-        # FIXED: Use standardized execute_query
         total_clients = execute_query('clients', 'count_all', fetch_one=True)
         active_clients = execute_query('clients', 'count_active', fetch_one=True)
         
