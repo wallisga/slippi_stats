@@ -377,25 +377,46 @@ def _process_standardized_games(client_id: str, games: List[UploadGameData]) -> 
         logger.error(f"Error processing standardized games for {client_id}: {str(e)}")
         return {'error': str(e), 'status': 'error'}
 
-def _process_client_info(client_info: Dict[str, Any]) -> Dict[str, Any]:
+def _process_client_info(client_info: Dict[str, Any]) -> dict:
     """
-    Process client info updates.
+    FIXED: Process client information during upload - verify client exists only.
+    Upload domain should NOT update client info, just verify upload permissions.
     
     Args:
-        client_info: Client information to update
+        client_info (dict): Client information from upload request
     
     Returns:
         dict: Processing result
     """
     try:
-        # For now, just acknowledge receipt - could extend to update client records
+        # Extract client_id
+        client_id = client_info.get('client_id')
+        if not client_id:
+            return {
+                'status': 'error',
+                'error': 'client_id is required for uploads'
+            }
+        
+        from backend.services.client import get_client_details
+        
+        # Verify client exists and is allowed to upload
+        client_details = get_client_details(client_id)
+        
+        if not client_details:
+            return {
+                'status': 'error',
+                'error': f'Client {client_id} not found or not authorized for uploads'
+            }
+        
+        # Client exists and can upload - success
         return {
-            'status': 'acknowledged',
-            'client_info_received': bool(client_info)
+            'status': 'verified',
+            'message': f'Client {client_id} verified for upload',
+            'client_id': client_id
         }
         
     except Exception as e:
-        logger.error(f"Error processing client info: {str(e)}")
+        logger.error(f"Error verifying client for upload: {str(e)}")
         return {
             'status': 'error',
             'error': str(e)

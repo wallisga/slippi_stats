@@ -56,27 +56,31 @@ class TestUploadServiceContracts:
     
     def test_upload_functions_exist_and_callable(self):
         """Test upload functions exist and are callable"""
-        from backend.services.api_service import (
+        # ✅ FIXED: Import from upload domain, not api_service
+        from backend.services.upload import (
             upload_games_for_client,
             process_combined_upload,
-            register_or_update_client,
             process_file_upload
         )
+        
+        # ✅ FIXED: Import client function from client domain
+        from backend.services.client import register_client
         
         # Test functions exist and are callable
         assert callable(upload_games_for_client)
         assert callable(process_combined_upload)  
-        assert callable(register_or_update_client)
         assert callable(process_file_upload)
+        assert callable(register_client)  # Updated to use client domain
     
     def test_upload_function_signatures(self):
         """Test upload functions have expected signatures"""
-        from backend.services.api_service import (
+        # ✅ FIXED: Import from correct domains
+        from backend.services.upload import (
             upload_games_for_client,
             process_combined_upload,
-            register_or_update_client,
             process_file_upload
         )
+        from backend.services.client import register_client
         
         # Test function signatures match expectations
         upload_games_sig = inspect.signature(upload_games_for_client)
@@ -85,11 +89,11 @@ class TestUploadServiceContracts:
         process_combined_sig = inspect.signature(process_combined_upload)
         assert len(process_combined_sig.parameters) == 2  # client_id, upload_data
         
-        register_client_sig = inspect.signature(register_or_update_client)
-        assert len(register_client_sig.parameters) == 1  # client_data
+        register_client_sig = inspect.signature(register_client)
+        assert len(register_client_sig.parameters) == 2  # raw_registration_data, registration_key
         
         process_file_sig = inspect.signature(process_file_upload)
-        assert len(process_file_sig.parameters) == 3  # client_id, file_data, metadata
+        assert len(process_file_sig.parameters) == 3  # client_id, file_info, file_content
 
     def test_file_upload_helper_functions(self):
         """Test file upload helper functions"""

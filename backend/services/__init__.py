@@ -21,7 +21,7 @@ from .client import (
 )
 
 __all__ = [
-    # Upload domain functions
+    # Upload domain functions (MIGRATED)
     'process_combined_upload',
     'upload_games_for_client', 
     'process_file_upload',
@@ -36,9 +36,6 @@ __all__ = [
     # Existing API Service functions (keeping current exports)
     'process_detailed_player_data', 
     'process_player_basic_stats',
-    
-    # Legacy client function (DEPRECATED - use client domain instead)
-    'register_or_update_client',  # Keep for backward compatibility temporarily
     
     # Existing Web Service functions  
     'prepare_homepage_data',
